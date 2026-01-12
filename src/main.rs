@@ -15,6 +15,7 @@ fn main() -> Result<(), std::io::Error> {
 
 #[cfg(feature = "preview")]
 mod preview {
+    use std::io::{self, Write};
     use std::time::{Duration, Instant};
     use embedded_graphics::geometry::Size as EgSize;
     use embedded_graphics_simulator::SimulatorDisplay;
@@ -34,6 +35,18 @@ mod preview {
         fn drop(&mut self) {
             let _ = disable_raw_mode();
         }
+    }
+
+    fn log_stdout(message: &str) {
+        let mut out = io::stdout();
+        let _ = write!(out, "\r{}\r\n", message);
+        let _ = out.flush();
+    }
+
+    fn log_stderr(message: &str) {
+        let mut out = io::stderr();
+        let _ = write!(out, "\r{}\r\n", message);
+        let _ = out.flush();
     }
 
     pub fn run() -> Result<(), std::io::Error> {
@@ -68,16 +81,16 @@ mod preview {
         let mut cups: u32 = 123;
         let mut step: u64 = 0;
 
-        println!("=== MaraTUI Preview Started ===");
-        println!("Controls:");
-        println!("  ESC/q - Exit");
-        println!("  a/←    - Previous screen");
-        println!("  d/→    - Next screen");
-        println!("  w      - Toggle debug mode");
-        println!("  +      - Increment cups");
-        println!("  -      - Decrement cups");
-        println!("==============================");
-        println!("Make sure SDL window has focus!");
+        log_stdout("=== MaraTUI Preview Started ===");
+        log_stdout("Controls:");
+        log_stdout("  ESC/q - Exit");
+        log_stdout("  a/←    - Previous screen");
+        log_stdout("  d/→    - Next screen");
+        log_stdout("  w      - Toggle debug mode");
+        log_stdout("  +      - Increment cups");
+        log_stdout("  -      - Decrement cups");
+        log_stdout("==============================");
+        log_stdout("Make sure SDL window has focus!");
 
         'main_loop: loop {
             // === INPUT HANDLING ===
@@ -91,12 +104,12 @@ mod preview {
                     }
 
                     // Debug: print key to console
-                    eprintln!("[KEY] {:?}", key_event.code);
+                    log_stderr(&format!("[KEY] {:?}", key_event.code));
 
                     match key_event.code {
                         // Exit
                         KeyCode::Esc | KeyCode::Char('q') => {
-                            println!("Exiting...");
+                            log_stdout("Exiting...");
                             break 'main_loop;
                         }
 
@@ -104,30 +117,39 @@ mod preview {
                         KeyCode::Char('a') | KeyCode::Left => {
                             let old_screen = ui_state.screen;
                             ui_state.screen = prev_screen(ui_state.screen);
-                            eprintln!("[UI] Screen: {:?} -> {:?}", old_screen, ui_state.screen);
+                            log_stderr(&format!(
+                                "[UI] Screen: {:?} -> {:?}",
+                                old_screen, ui_state.screen
+                            ));
                         }
 
                         // Navigation: next screen
                         KeyCode::Char('d') | KeyCode::Right => {
                             let old_screen = ui_state.screen;
                             ui_state.screen = next_screen(ui_state.screen);
-                            eprintln!("[UI] Screen: {:?} -> {:?}", old_screen, ui_state.screen);
+                            log_stderr(&format!(
+                                "[UI] Screen: {:?} -> {:?}",
+                                old_screen, ui_state.screen
+                            ));
                         }
 
                         // Toggle debug mode
                         KeyCode::Char('w') => {
                             ui_state.show_debug = !ui_state.show_debug;
-                            eprintln!("[UI] Debug mode: {}", ui_state.show_debug);
+                            log_stderr(&format!(
+                                "[UI] Debug mode: {}",
+                                ui_state.show_debug
+                            ));
                         }
 
                         // Manual cup counter (for testing)
                         KeyCode::Char('+') => {
                             cups = cups.saturating_add(1);
-                            eprintln!("[UI] Cups: {}", cups);
+                            log_stderr(&format!("[UI] Cups: {}", cups));
                         }
                         KeyCode::Char('-') => {
                             cups = cups.saturating_sub(1);
-                            eprintln!("[UI] Cups: {}", cups);
+                            log_stderr(&format!("[UI] Cups: {}", cups));
                         }
 
                         // Ignore other keys
@@ -149,7 +171,10 @@ mod preview {
                 let frame: TelemetryFrame = 
                     parse_uart_line(&uart_line)
                         .unwrap_or_else(|_| {
-                            eprintln!("[ERROR] Failed to parse UART line: {}", uart_line);
+                            log_stderr(&format!(
+                                "[ERROR] Failed to parse UART line: {}",
+                                uart_line
+                            ));
                             fallback_frame()
                         });
 
@@ -161,7 +186,7 @@ mod preview {
                 // Store recent events for debugging
                 for event in events {
                     recent_events.push((now, event.clone()));
-                    eprintln!("[EVENT] {:?}", event);
+                    log_stderr(&format!("[EVENT] {:?}", event));
                     
                     // Keep only last N events
                     if recent_events.len() > max_events {
