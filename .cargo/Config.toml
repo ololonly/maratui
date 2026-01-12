@@ -1,0 +1,5 @@
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+  "-L", "native=C:\\vcpkg\\installed\\x64-windows\\lib",
+  "-L", "native=C:\\vcpkg\\installed\\x64-windows\\bin",
+]

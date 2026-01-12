@@ -1,0 +1,13 @@
+[package]
+name = "maratui"
+version = "0.1.0"
+edition = "2026"
+
+[features]
+preview = []
+
+[dependencies]
+embedded-graphics-simulator = "0.7"
+mousefood = { version = "0.2.1", features = ["simulator"] }
+ratatui = "0.29"
+embedded-graphics = "0.8"
