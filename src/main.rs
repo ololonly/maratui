@@ -1,33 +1,27 @@
+mod rat_art;
 mod telemetry;
-mod ui;
+mod uiApp;
 
-#[cfg(not(feature = "preview"))]
-fn main() {
-    println!("Desktop preview is disabled.");
-    println!("Run preview window with:");
-    println!("  cargo run --features preview");
-}
-
-#[cfg(feature = "preview")]
 fn main() -> Result<(), std::io::Error> {
     preview::run()
 }
 
-#[cfg(feature = "preview")]
 mod preview {
-    use std::io::{self, Write};
-    use std::time::{Duration, Instant};
-    use embedded_graphics::geometry::Size as EgSize;
+    use crate::rat_art::{draw_image_from_file, draw_rat_chef};
+    use crate::telemetry::{
+        MachineState, TelemetryFrame, parse_uart_line, update_state_with_events,
+    };
+    use crate::uiApp::UiApp;
+    use embedded_graphics::geometry::{Point, Size as EgSize};
     use embedded_graphics_simulator::SimulatorDisplay;
     use mousefood::prelude::*;
-    use ratatui::{Terminal, widgets::Clear};
     use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
     use ratatui::crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-    use crate::telemetry::{
-        AppEvent, MachineState, TelemetryFrame, 
-        parse_uart_line, update_state_with_events,
-    };
-    use crate::ui::{Screen, UiState, render_app};
+    use ratatui::{Terminal, widgets::Clear};
+    use std::cell::RefCell;
+    use std::io::{self, Write};
+    use std::rc::Rc;
+    use std::time::{Duration, Instant};
 
     // Guard to restore terminal mode on exit (even if panic occurs)
     struct RawModeGuard;
@@ -56,27 +50,45 @@ mod preview {
 
         // T-Display dimensions: 240x135 landscape
         let (width, height) = (240u32, 135u32);
-        let mut display: SimulatorDisplay<Bgr565> = 
+        let mut display: SimulatorDisplay<Bgr565> =
             SimulatorDisplay::new(EgSize::new(width, height));
 
-        // Create backend + terminal. Must stay alive to keep SDL window open.
+        // Shared state for rat animation frame
+        let rat_frame = Rc::new(RefCell::new(0usize));
+        let rat_frame_clone = rat_frame.clone();
+
+        // Create backend with flush callback that draws rat chef
+        let config = EmbeddedBackendConfig {
+            flush_callback: Box::new(move |display: &mut SimulatorDisplay<Bgr565>| {
+                // Try to load image from file first, fallback to drawing function
+                let rat_pos = Point::new(10, 20);
+                let frame = *rat_frame_clone.borrow();
+
+                // Try loading from "rat_chef.png" or "rat_chef.bmp" in project root
+                // If file not found, fallback to drawing function
+                if !draw_image_from_file(display, "rat_chef.png", rat_pos) {
+                    if !draw_image_from_file(display, "rat_chef.bmp", rat_pos) {
+                        // Fallback to drawing function
+                        let _ = draw_rat_chef(display, rat_pos, frame);
+                    }
+                }
+            }),
+            ..Default::default()
+        };
+
         let backend: EmbeddedBackend<'_, SimulatorDisplay<Bgr565>, Bgr565> =
-            EmbeddedBackend::new(&mut display, EmbeddedBackendConfig::default());
+            EmbeddedBackend::new(&mut display, config);
         let mut terminal = Terminal::new(backend)?;
 
         // Application state
-        let mut ui_state = UiState::default();
+        let mut ui_app = UiApp::new();
         let mut machine_state = MachineState::default();
-        
-        // For tracking events and debugging
-        let mut recent_events: Vec<(Instant, AppEvent)> = Vec::new();
-        let max_events = 5; // Keep last 5 events for display
 
         // Timing
         let start_time = Instant::now();
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(100); // Update UI every 100ms
-        
+
         // Test data
         let mut cups: u32 = 123;
         let mut step: u64 = 0;
@@ -84,8 +96,8 @@ mod preview {
         log_stdout("=== MaraTUI Preview Started ===");
         log_stdout("Controls:");
         log_stdout("  ESC/q - Exit");
-        log_stdout("  a/←    - Previous screen");
-        log_stdout("  d/→    - Next screen");
+        log_stdout("  a/←    - Previous tab");
+        log_stdout("  d/→    - Next tab");
         log_stdout("  w      - Toggle debug mode");
         log_stdout("  +      - Increment cups");
         log_stdout("  -      - Decrement cups");
@@ -115,31 +127,20 @@ mod preview {
 
                         // Navigation: previous screen
                         KeyCode::Char('a') | KeyCode::Left => {
-                            let old_screen = ui_state.screen;
-                            ui_state.screen = prev_screen(ui_state.screen);
-                            log_stderr(&format!(
-                                "[UI] Screen: {:?} -> {:?}",
-                                old_screen, ui_state.screen
-                            ));
+                            ui_app.previous_tab();
+                            log_stderr(&format!("[UI] Previous tab"));
                         }
 
                         // Navigation: next screen
                         KeyCode::Char('d') | KeyCode::Right => {
-                            let old_screen = ui_state.screen;
-                            ui_state.screen = next_screen(ui_state.screen);
-                            log_stderr(&format!(
-                                "[UI] Screen: {:?} -> {:?}",
-                                old_screen, ui_state.screen
-                            ));
+                            ui_app.next_tab();
+                            log_stderr(&format!("[UI] Next tab"));
                         }
 
                         // Toggle debug mode
                         KeyCode::Char('w') => {
-                            ui_state.show_debug = !ui_state.show_debug;
-                            log_stderr(&format!(
-                                "[UI] Debug mode: {}",
-                                ui_state.show_debug
-                            ));
+                            ui_app.toggle_debug();
+                            log_stderr(&format!("[UI] Debug mode toggled"));
                         }
 
                         // Manual cup counter (for testing)
@@ -166,47 +167,38 @@ mod preview {
 
                 // Generate dummy UART data
                 let uart_line = dummy_uart_line(start_time, step);
-                
+
                 // Parse UART line into telemetry frame
-                let frame: TelemetryFrame = 
-                    parse_uart_line(&uart_line)
-                        .unwrap_or_else(|_| {
-                            log_stderr(&format!(
-                                "[ERROR] Failed to parse UART line: {}",
-                                uart_line
-                            ));
-                            fallback_frame()
-                        });
+                let frame: TelemetryFrame = parse_uart_line(&uart_line).unwrap_or_else(|_| {
+                    log_stderr(&format!("[ERROR] Failed to parse UART line: {}", uart_line));
+                    fallback_frame()
+                });
 
                 // Update machine state and get events
                 let now = Instant::now();
-                let (snapshot, events) = 
-                    update_state_with_events(&mut machine_state, frame, now);
+                let (snapshot, events) = update_state_with_events(&mut machine_state, frame, now);
 
-                // Store recent events for debugging
+                // Update rat animation frame (before moving snapshot)
+                *rat_frame.borrow_mut() = snapshot.frame.boost_countdown_s as usize;
+
+                // Update UI app state
+                ui_app.update_telemetry(Some(snapshot));
+                ui_app.update_cups(Some(cups));
+
+                // Store recent events
                 for event in events {
-                    recent_events.push((now, event.clone()));
+                    ui_app.add_event(event.clone(), now);
                     log_stderr(&format!("[EVENT] {:?}", event));
-                    
-                    // Keep only last N events
-                    if recent_events.len() > max_events {
-                        recent_events.remove(0);
-                    }
                 }
 
                 // === RENDERING ===
+                // Rat is drawn in flush_callback after ratatui renders
                 terminal.draw(|frame| {
                     // Clear entire area to prevent ghosting
                     frame.render_widget(Clear, frame.area());
 
-                    // Render main UI
-                    render_app(
-                        frame, 
-                        &ui_state, 
-                        Some(&snapshot), 
-                        Some(cups),
-                        &recent_events, // Pass events for debug display
-                    );
+                    // Render UI app
+                    frame.render_widget(&ui_app, frame.area());
                 })?;
             }
 
@@ -217,24 +209,6 @@ mod preview {
         Ok(())
     }
 
-    /// Get next screen in sequence
-    fn next_screen(current: Screen) -> Screen {
-        match current {
-            Screen::Dashboard => Screen::Details,
-            Screen::Details => Screen::History,
-            Screen::History => Screen::Dashboard,
-        }
-    }
-
-    /// Get previous screen in sequence
-    fn prev_screen(current: Screen) -> Screen {
-        match current {
-            Screen::Dashboard => Screen::History,
-            Screen::Details => Screen::Dashboard,
-            Screen::History => Screen::Details,
-        }
-    }
-
     /// Generate dummy UART line for testing
     /// Simulates coffee machine telemetry with varying states
     fn dummy_uart_line(start: Instant, step: u64) -> String {
@@ -242,12 +216,16 @@ mod preview {
 
         // Simulate temperature fluctuations
         let boiler_temp = (92.0_f32 + (elapsed_secs * 0.7_f32).sin() * 4.0_f32).round() as i32;
-        let boiler_target = if (elapsed_secs as u64 / 10) % 2 == 0 { 93 } else { 94 };
+        let boiler_target = if (elapsed_secs as u64 / 10) % 2 == 0 {
+            93
+        } else {
+            94
+        };
         let hx_temp = boiler_temp.saturating_sub(8);
 
         // Simulate boost countdown
         let boost = ((step / 5) % 30) as i32;
-        
+
         // Heating is on when below target
         let heating = if boiler_temp < boiler_target { 1 } else { 0 };
 
@@ -264,9 +242,9 @@ mod preview {
         };
 
         // Simulate mode changes
-        let mode = if (elapsed_secs as u64) % 45 == 40 { 
+        let mode = if (elapsed_secs as u64) % 45 == 40 {
             'X' // Offline
-        } else { 
+        } else {
             'C' // Steam mode
         };
 

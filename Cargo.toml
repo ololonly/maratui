@@ -11,3 +11,7 @@ embedded-graphics-simulator = "0.7"
 mousefood = { version = "0.2.1", features = ["simulator"] }
 ratatui = "0.29"
 embedded-graphics = "0.8"
+color-eyre = "0.6.5"
+strum = "0.27.2"
+strum_macros = "0.27.2"
+image = "0.25"
