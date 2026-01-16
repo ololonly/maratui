@@ -1,17 +1,98 @@
 mod rat_art;
 mod telemetry;
-mod uiApp;
+mod ui_app;
 
 fn main() -> Result<(), std::io::Error> {
-    preview::run()
+    #[cfg(feature = "preview")]
+    {
+        preview::run()?;
+    }
+    
+    #[cfg(not(feature = "preview"))]
+    {
+        release::main();
+    }
+    
+    Ok(())
+}
+
+#[cfg(feature = "esp")]
+mod release {
+    use crate::telemetry::{MachineState, TelemetryFrame, parse_uart_line, update_state_with_events};
+    use crate::ui_app::{Screen, UiApp};
+    use maratui::button::Button;
+    use maratui::setup::App;
+    use mousefood::prelude::*;
+    use ratatui::widgets::Clear;
+    use std::time::{Duration, Instant};
+
+    /// Application state for release version.
+    pub struct AppState {
+        ui_app: UiApp,
+        machine_state: MachineState,
+        last_tick: Instant,
+        tick_rate: Duration,
+    }
+
+    impl Default for AppState {
+        fn default() -> Self {
+            Self {
+                ui_app: UiApp::new(),
+                machine_state: MachineState::default(),
+                last_tick: Instant::now(),
+                tick_rate: Duration::from_millis(100),
+            }
+        }
+    }
+
+    impl App for AppState {
+        /// Draw the UI frame.
+        fn draw(&self, frame: &mut Frame) {
+            // Clear to prevent ghosting
+            frame.render_widget(Clear, frame.area());
+            // Render UI app
+            frame.render_widget(&self.ui_app, frame.area());
+        }
+
+        /// Handle button press events.
+        fn handle_press(&mut self, button: Button) {
+            match button {
+                Button::Button1(_) | Button::Button2(_) if button.is_short_press() => {
+                    // Short press: navigate tabs
+                    if button.is_button1() {
+                        self.ui_app.previous_tab();
+                    } else {
+                        self.ui_app.next_tab();
+                    }
+                }
+                Button::Both => {
+                    // Both buttons: toggle debug
+                    self.ui_app.toggle_debug();
+                }
+                _ => {
+                    // Long press or other: do nothing for now
+                }
+            }
+        }
+    }
+
+    fn main() {
+        // For now, just run the app with empty telemetry
+        // In real implementation, you would read from UART here
+        let mut app = AppState::default();
+        
+        // TODO: Add UART reading loop here
+        // For now, just run the UI loop
+        app.run();
+    }
 }
 
 mod preview {
-    use crate::rat_art::{draw_image_from_file, draw_rat_chef};
+    use crate::rat_art::{GifAnimation, draw_gif_frame, draw_image_from_file};
     use crate::telemetry::{
         MachineState, TelemetryFrame, parse_uart_line, update_state_with_events,
     };
-    use crate::uiApp::UiApp;
+    use crate::ui_app::{Screen, UiApp};
     use embedded_graphics::geometry::{Point, Size as EgSize};
     use embedded_graphics_simulator::SimulatorDisplay;
     use mousefood::prelude::*;
@@ -53,23 +134,37 @@ mod preview {
         let mut display: SimulatorDisplay<Bgr565> =
             SimulatorDisplay::new(EgSize::new(width, height));
 
-        // Shared state for rat animation frame
-        let rat_frame = Rc::new(RefCell::new(0usize));
-        let rat_frame_clone = rat_frame.clone();
+        // Application state - wrapped in Rc<RefCell<>> so flush_callback can access it
+        let ui_app = Rc::new(RefCell::new(UiApp::new()));
+        let mut machine_state = MachineState::default();
+
+        // Load GIF animation (try to load once at startup)
+        let gif_animation = Rc::new(RefCell::new(
+            GifAnimation::load_from_file("assets/rat_chef.gif").unwrap_or_else(|e| {
+                log_stderr(&format!("Failed to load GIF: {}, using empty animation", e));
+                GifAnimation::new()
+            }),
+        ));
 
         // Create backend with flush callback that draws rat chef
+        let ui_app_clone = Rc::clone(&ui_app);
+        let gif_animation_clone = Rc::clone(&gif_animation);
         let config = EmbeddedBackendConfig {
             flush_callback: Box::new(move |display: &mut SimulatorDisplay<Bgr565>| {
-                // Try to load image from file first, fallback to drawing function
-                let rat_pos = Point::new(10, 20);
-                let frame = *rat_frame_clone.borrow();
+                let rat_pos = Point::new(1, 30);
+                let screen = ui_app_clone.borrow().state.screen;
+                let now = Instant::now();
 
-                // Try loading from "rat_chef.png" or "rat_chef.bmp" in project root
-                // If file not found, fallback to drawing function
-                if !draw_image_from_file(display, "rat_chef.png", rat_pos) {
-                    if !draw_image_from_file(display, "rat_chef.bmp", rat_pos) {
-                        // Fallback to drawing function
-                        let _ = draw_rat_chef(display, rat_pos, frame);
+                if screen == Screen::Main {
+                    // Try to draw animated GIF first
+                    let mut anim = gif_animation_clone.borrow_mut();
+                    if anim.is_loaded() {
+                        draw_gif_frame(display, &mut anim, rat_pos, now);
+                    } else {
+                        // Fallback to static PNG
+                        if !draw_image_from_file(display, "assets/rat_chef.png", rat_pos) {
+                            // Fallback to drawing function (if implemented)
+                        }
                     }
                 }
             }),
@@ -79,10 +174,6 @@ mod preview {
         let backend: EmbeddedBackend<'_, SimulatorDisplay<Bgr565>, Bgr565> =
             EmbeddedBackend::new(&mut display, config);
         let mut terminal = Terminal::new(backend)?;
-
-        // Application state
-        let mut ui_app = UiApp::new();
-        let mut machine_state = MachineState::default();
 
         // Timing
         let start_time = Instant::now();
@@ -127,19 +218,19 @@ mod preview {
 
                         // Navigation: previous screen
                         KeyCode::Char('a') | KeyCode::Left => {
-                            ui_app.previous_tab();
+                            ui_app.borrow_mut().previous_tab();
                             log_stderr(&format!("[UI] Previous tab"));
                         }
 
                         // Navigation: next screen
                         KeyCode::Char('d') | KeyCode::Right => {
-                            ui_app.next_tab();
+                            ui_app.borrow_mut().next_tab();
                             log_stderr(&format!("[UI] Next tab"));
                         }
 
                         // Toggle debug mode
                         KeyCode::Char('w') => {
-                            ui_app.toggle_debug();
+                            ui_app.borrow_mut().toggle_debug();
                             log_stderr(&format!("[UI] Debug mode toggled"));
                         }
 
@@ -179,15 +270,14 @@ mod preview {
                 let (snapshot, events) = update_state_with_events(&mut machine_state, frame, now);
 
                 // Update rat animation frame (before moving snapshot)
-                *rat_frame.borrow_mut() = snapshot.frame.boost_countdown_s as usize;
 
                 // Update UI app state
-                ui_app.update_telemetry(Some(snapshot));
-                ui_app.update_cups(Some(cups));
+                ui_app.borrow_mut().update_telemetry(Some(snapshot));
+                ui_app.borrow_mut().update_cups(Some(cups));
 
                 // Store recent events
                 for event in events {
-                    ui_app.add_event(event.clone(), now);
+                    ui_app.borrow_mut().add_event(event.clone(), now);
                     log_stderr(&format!("[EVENT] {:?}", event));
                 }
 
@@ -198,7 +288,7 @@ mod preview {
                     frame.render_widget(Clear, frame.area());
 
                     // Render UI app
-                    frame.render_widget(&ui_app, frame.area());
+                    frame.render_widget(&*ui_app.borrow(), frame.area());
                 })?;
             }
 

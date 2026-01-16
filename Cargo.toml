@@ -1,17 +1,33 @@
 [package]
 name = "maratui"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [features]
-preview = []
+default = ["esp"]
+preview = ["embedded-graphics-simulator", "mousefood/simulator"]
+esp = ["esp-idf-svc", "mipidsi"]
 
 [dependencies]
-embedded-graphics-simulator = "0.7"
-mousefood = { version = "0.2.1", features = ["simulator"] }
-ratatui = "0.29"
+# Preview-only dependencies (simulator)
+embedded-graphics-simulator = { version = "0.7", optional = true }
+
+# Common dependencies (available in both preview and esp)
 embedded-graphics = "0.8"
 color-eyre = "0.6.5"
 strum = "0.27.2"
 strum_macros = "0.27.2"
-image = "0.25"
+image = { version = "0.25", default-features = false, features = ["png", "gif"] }
+include_dir = "0.7.4"
+anyhow = "1.0.100"
+mousefood = { version = "0.2.1", default-features = false }
+ratatui = "0.29"
+
+# ESP32 dependencies (only when esp feature is enabled, excluded when preview is enabled)
+esp-idf-svc = { version = "0.51.0", optional = true }
+mipidsi = { version = "0.9.0", optional = true }
+
+[profile.release]
+opt-level = "s"  # Optimize for size
+lto = true
+codegen-units = 1

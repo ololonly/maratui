@@ -1,18 +1,18 @@
 use crate::telemetry::{AppEvent, Snapshot};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
     symbols,
     text::Line,
-    widgets::{Block, Paragraph, Tabs, Widget},
+    widgets::{Block, Padding, Paragraph, Tabs, Widget},
 };
 use std::time::Instant;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, FromRepr};
 
 pub struct UiApp {
-    state: AppState,
+    pub state: AppState,
 }
 
 #[derive(Default)]
@@ -24,7 +24,7 @@ pub struct AppState {
     pub show_debug: bool,
 }
 
-#[derive(Default, Clone, Copy, Display, FromRepr, EnumIter)]
+#[derive(Default, Clone, Copy, Display, FromRepr, EnumIter, PartialEq)]
 pub enum Screen {
     #[default]
     #[strum(to_string = "Main")]
@@ -76,7 +76,7 @@ impl UiApp {
         let titles: Vec<&str> = Screen::iter().map(|s| s.as_str()).collect();
         let selected_tab_index = self.state.screen as usize;
         Tabs::new(titles)
-            .style(Style::default().cyan())
+            .style(Style::default().cyan().underlined())
             .highlight_style(Style::default().yellow())
             .select(selected_tab_index)
             .divider(symbols::DOT)
@@ -87,26 +87,33 @@ impl UiApp {
 
 impl Widget for &UiApp {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let layout = Layout::default()
+            .direction(ratatui::layout::Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Percentage(100)])
+            .margin(0)
+            .split(area);
+
+        // Left area: pixel rat is drawn via embedded-graphics in flush_callback
+        // Just leave it empty or show a subtle indicator
+        let tabs_area = layout[0];
+        // Paragraph::new("")
+        //     .block(Block::bordered().title(" 🐀 Chef Rat "))
+        //     .render(rat_area, buf);
+
+        // Render status text on the right
+        let content_area = layout[1];
+
+        self.render_tabs(tabs_area, buf);
         // Render content with border first (on full area)
         // This draws the complete border frame
         self.state.screen.render_tab_content(
-            area,
+            content_area,
             buf,
             self.state.snapshot.as_ref(),
             self.state.cups,
             self.state.show_debug,
             &self.state.recent_events,
         );
-
-        // Render tabs on the top border line (y = area.y)
-        // This overlays the tabs on top of the border, making it pass through
-        let tabs_area = Rect {
-            x: area.x + 1,
-            y: area.y,
-            width: area.width.saturating_sub(2),
-            height: 1,
-        };
-        self.render_tabs(tabs_area, buf);
     }
 }
 
@@ -185,15 +192,15 @@ impl Screen {
         // No inner margins - border should pass through tabs
         let layout = Layout::default()
             .direction(ratatui::layout::Direction::Horizontal)
-            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
 
         // Left area: pixel rat is drawn via embedded-graphics in flush_callback
         // Just leave it empty or show a subtle indicator
-        let rat_area = layout[0];
-        Paragraph::new("")
-            .block(Block::bordered().title(" 🐀 Chef Rat "))
-            .render(rat_area, buf);
+        let _rat_area = layout[0];
+        // Paragraph::new("")
+        //     .block(Block::bordered().title(" 🐀 Chef Rat "))
+        //     .render(rat_area, buf);
 
         // Render status text on the right
         let status_area = layout[1];
@@ -209,7 +216,7 @@ impl Screen {
     ) {
         let mut lines = Vec::new();
 
-        // Status text
+        // Status text - split by newlines to create multiple lines
         let status = if let Some(s) = snapshot {
             if matches!(s.frame.mode, crate::telemetry::MachineMode::Offline) {
                 "Loading system...\nConnecting to HA..."
@@ -220,7 +227,10 @@ impl Screen {
             "Waiting for\ntelemetry..."
         };
 
-        lines.push(ratatui::text::Line::from(status));
+        // Split by newlines and create a Line for each part
+        for line_text in status.split('\n') {
+            lines.push(ratatui::text::Line::from(line_text));
+        }
 
         // Mode and cups
         if let Some(s) = snapshot {
@@ -234,7 +244,7 @@ impl Screen {
         }
 
         Paragraph::new(lines)
-            .block(Block::bordered().title(" Status "))
+            .block(Block::default().padding(Padding::new(0, 0, 1, 0)))
             .render(area, buf);
     }
 
