@@ -1,10 +1,9 @@
 use crate::telemetry::{AppEvent, Snapshot};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Margin, Rect},
+    layout::{Constraint, Layout, Rect},
     style::{Style, Stylize},
     symbols,
-    text::Line,
     widgets::{Block, Padding, Paragraph, Tabs, Widget},
 };
 use std::time::Instant;
@@ -151,8 +150,8 @@ impl Screen {
         buf: &mut Buffer,
         snapshot: Option<&Snapshot>,
         cups: Option<u32>,
-        show_debug: bool,
-        recent_events: &[(Instant, AppEvent)],
+        _show_debug: bool,
+        _recent_events: &[(Instant, AppEvent)],
     ) {
         match self {
             Self::Main => {

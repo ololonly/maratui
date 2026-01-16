@@ -18,8 +18,7 @@ fn main() -> Result<(), std::io::Error> {
 
 #[cfg(feature = "esp")]
 mod release {
-    use crate::telemetry::{MachineState, TelemetryFrame, parse_uart_line, update_state_with_events};
-    use crate::ui_app::{Screen, UiApp};
+    use crate::telemetry::{MachineState};
     use maratui::button::Button;
     use maratui::setup::App;
     use mousefood::prelude::*;
@@ -76,10 +75,10 @@ mod release {
         }
     }
 
-    fn main() {
+    pub fn main() {
         // For now, just run the app with empty telemetry
         // In real implementation, you would read from UART here
-        let mut app = AppState::default();
+        let app = AppState::default();
         
         // TODO: Add UART reading loop here
         // For now, just run the UI loop
@@ -87,6 +86,7 @@ mod release {
     }
 }
 
+#[cfg(feature = "preview")]
 mod preview {
     use crate::rat_art::{GifAnimation, draw_gif_frame, draw_image_from_file};
     use crate::telemetry::{
