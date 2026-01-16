@@ -1,28 +1,15 @@
-#[cfg(feature = "esp")]
 use crate::button::{Button, ButtonState};
-#[cfg(feature = "esp")]
 use esp_idf_svc::hal::delay::Ets;
-#[cfg(feature = "esp")]
 use esp_idf_svc::hal::gpio::{AnyIOPin, InterruptType, PinDriver};
-#[cfg(feature = "esp")]
 use esp_idf_svc::hal::prelude::*;
-#[cfg(feature = "esp")]
 use esp_idf_svc::hal::spi::config::MODE_3;
-#[cfg(feature = "esp")]
 use esp_idf_svc::hal::spi::{SpiConfig, SpiDeviceDriver, SpiDriverConfig};
-#[cfg(feature = "esp")]
-use mipidsi::interface::SpiInterface;
-#[cfg(feature = "esp")]
-use mipidsi::models::ST7789;
-#[cfg(feature = "esp")]
-use mipidsi::options::{ColorInversion, Orientation, Rotation};
-#[cfg(feature = "esp")]
 use mipidsi::Builder;
-#[cfg(feature = "esp")]
+use mipidsi::interface::SpiInterface;
+use mipidsi::models::ST7789;
+use mipidsi::options::{ColorInversion, Orientation, Rotation};
 use mousefood::embedded_graphics::draw_target::DrawTarget;
-#[cfg(feature = "esp")]
-use mousefood::embedded_graphics::prelude::RgbColor;
-#[cfg(feature = "esp")]
+use mousefood::embedded_graphics::prelude::*;
 use mousefood::prelude::*;
 
 /// Offset to align the display correctly.
@@ -31,7 +18,6 @@ const DISPLAY_OFFSET: (u16, u16) = (52, 40);
 /// Display size in pixels.
 const DISPLAY_SIZE: (u16, u16) = (135, 240);
 
-#[cfg(feature = "esp")]
 /// Application trait to be implemented by the user.
 pub trait App {
     /// Draw the UI frame.
@@ -51,7 +37,6 @@ pub trait App {
     }
 }
 
-#[cfg(feature = "esp")]
 /// Run the application with the provided [`App`] implementation.
 ///
 /// It initializes the hardware, sets up the display and buttons,
@@ -118,26 +103,8 @@ fn run_app(mut app: impl App) {
     let mut button2_state = ButtonState::default();
 
     // Setup Mousefood and Ratatui
-    // NOTE: There's a type compatibility issue between mipidsi::Display and EmbeddedBackend
-    // This needs to be resolved - possibly by using a different display driver or adapter
-    // For now, we'll need to check mousefood documentation or examples for the correct approach
-    //
-    // The error suggests EmbeddedBackend expects SimulatorDisplay, but we have mipidsi::Display
-    // This might require:
-    // 1. Using a different version of mousefood
-    // 2. Creating an adapter/wrapper for the display
-    // 3. Using a different display driver that's compatible
-    //
-    // TODO: Fix this integration issue
-    // For now, commenting out to allow compilation - you'll need to fix this before flashing
-    //
-    // let config = EmbeddedBackendConfig::default();
-    // let backend = EmbeddedBackend::new(&mut display, config);
-    // let mut terminal = Terminal::new(backend).unwrap();
-
-    // Placeholder - this won't work until the type issue is resolved
-    // You may need to check the embedded-ratatui-workshop template for the correct approach
-    let _terminal_placeholder = ();
+    let backend = EmbeddedBackend::new(&mut display, Default::default());
+    let mut terminal = Terminal::new(backend).unwrap();
 
     // Enter main event loop
     loop {
@@ -159,18 +126,10 @@ fn run_app(mut app: impl App) {
         }
 
         // Draw the UI
-        // TODO: Uncomment when terminal integration is fixed
-        // terminal
-        //     .draw(|f| {
-        //         app.draw(f);
-        //     })
-        //     .unwrap();
-
-        // Temporary placeholder - replace with proper rendering
-        let _ = &_terminal_placeholder;
-
-        // For now, just clear the display to show something is happening
-        // In a real implementation, you'd render the UI here
-        display.clear(Rgb565::BLACK).unwrap();
+        terminal
+            .draw(|f| {
+                app.draw(f);
+            })
+            .unwrap();
     }
 }

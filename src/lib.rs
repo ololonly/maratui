@@ -1,3 +1,5 @@
-pub mod button;
-#[cfg(feature = "esp")]
+/// Application setup.
 pub mod setup;
+
+/// Button handling.
+pub mod button;
