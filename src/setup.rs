@@ -19,6 +19,10 @@ use mipidsi::options::{ColorInversion, Orientation, Rotation};
 #[cfg(feature = "esp")]
 use mipidsi::Builder;
 #[cfg(feature = "esp")]
+use mousefood::embedded_graphics::draw_target::DrawTarget;
+#[cfg(feature = "esp")]
+use mousefood::embedded_graphics::prelude::RgbColor;
+#[cfg(feature = "esp")]
 use mousefood::prelude::*;
 
 /// Offset to align the display correctly.
