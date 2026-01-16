@@ -1293,6 +1293,7 @@ dependencies = [
  "color-eyre",
  "embedded-graphics",
  "embedded-graphics-simulator",
+ "embuild",
  "esp-idf-svc",
  "image",
  "include_dir",
