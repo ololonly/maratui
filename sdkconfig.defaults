@@ -1,0 +1,5 @@
+# Disable MQTT component (not needed for this project)
+CONFIG_MQTT_ENABLED=n
+
+# Alternative: if the above doesn't work, you may need to update ESP-IDF submodules
+# Run in WSL: cd ~/.esp/esp-idf && git submodule update --init --recursive
