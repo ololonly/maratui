@@ -1,6 +1,3 @@
-# Configuration for ESP32 builds
-# This file is used when building for ESP32 targets in WSL
-
 [build]
 target = "xtensa-esp32-espidf"
 
@@ -23,6 +20,7 @@ build-std = ["std", "panic_abort"]
 MCU="esp32"
 # Note: this variable is not used by the pio builder (`cargo build --features pio`)
 ESP_IDF_VERSION = "v5.2.3"
+
 
 # For Windows preview builds (when building with --target x86_64-pc-windows-msvc)
 [target.x86_64-pc-windows-msvc]
