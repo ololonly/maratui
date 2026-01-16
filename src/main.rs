@@ -19,6 +19,7 @@ fn main() -> Result<(), std::io::Error> {
 #[cfg(feature = "esp")]
 mod release {
     use crate::telemetry::{MachineState};
+    use crate::ui_app::UiApp;
     use maratui::button::Button;
     use maratui::setup::App;
     use mousefood::prelude::*;
