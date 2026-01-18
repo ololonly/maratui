@@ -7,6 +7,9 @@ edition = "2024"
 esp-idf-svc = { version = "0.51", features = ["critical-section"] }
 mipidsi = "0.9.0"
 mousefood = "0.2.1"
+strum = "0.27.2"
+strum_macros = "0.27.2"
+tinyqoi = "0.2.0"
 
 [build-dependencies]
 embuild = { version = "0.33", features = ["espidf"] }

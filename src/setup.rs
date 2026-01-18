@@ -19,12 +19,15 @@ const DISPLAY_OFFSET: (u16, u16) = (52, 40);
 const DISPLAY_SIZE: (u16, u16) = (135, 240);
 
 /// Application trait to be implemented by the user.
-pub trait App {
+pub trait MaraUiApp {
     /// Draw the UI frame.
     fn draw(&self, frame: &mut Frame);
 
     /// Handle button press events.
     fn handle_press(&mut self, button: Button);
+
+    fn next_tab(&mut self);
+    fn previous_tab(&mut self);
 
     /// Run the application.
     ///
@@ -46,7 +49,7 @@ pub trait App {
 /// It is meant to be called once at the start of the program (e.g., in `main`).
 ///
 /// Errors are not handled and will cause a panic if they occur.
-fn run_app(mut app: impl App) {
+fn run_app(mut app: impl MaraUiApp) {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 
