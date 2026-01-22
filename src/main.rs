@@ -197,17 +197,17 @@ impl MaraUi {
             .wrap(Wrap { trim: true })
             .centered()
             .block(Block::default())
-            .render(col1_areas[0], buf);
+            .render(col3_areas[0], buf);
         Paragraph::new(Line::from(format!("Heating {}", t_frame.heating_on)))
             .wrap(Wrap { trim: true })
             .centered()
             .block(Block::default())
-            .render(col1_areas[1], buf);
+            .render(col3_areas[1], buf);
         Paragraph::new(Line::from(format!("Pump {}", t_frame.pump_on)))
             .wrap(Wrap { trim: true })
             .centered()
             .block(Block::default())
-            .render(col1_areas[2], buf);
+            .render(col3_areas[2], buf);
 
         frame.render_widget(big_text, col2);
     }
