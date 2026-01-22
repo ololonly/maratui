@@ -20,11 +20,3 @@ build-std = ["std", "panic_abort"]
 MCU="esp32"
 # Note: this variable is not used by the pio builder (`cargo build --features pio`)
 ESP_IDF_VERSION = "v5.2.3"
-
-
-# For Windows preview builds (when building with --target x86_64-pc-windows-msvc)
-[target.x86_64-pc-windows-msvc]
-rustflags = [
-  "-L", "native=C:\\vcpkg\\installed\\x64-windows\\lib",
-  "-L", "native=C:\\vcpkg\\installed\\x64-windows\\bin",
-]
