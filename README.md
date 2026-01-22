@@ -1,4 +1,4 @@
-![Rat Chef](assets/rat_chef.png)
+![Rat Chef](assets/rat_barista.png)
 
 # MaraTUI
 
