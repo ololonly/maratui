@@ -8,7 +8,6 @@ use mousefood::ratatui::layout::{Direction, Layout};
 use mousefood::ratatui::widgets::{
     Axis, Block, Chart, Dataset, GraphType, LegendPosition, Paragraph, Tabs, Wrap,
 };
-use serde_json::Serializer;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, FromRepr};
 use tinyqoi::Qoi;
