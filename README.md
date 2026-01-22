@@ -1,4 +1,8 @@
+<div align="center">
+
 ![Rat Chef](assets/rat_barista.png)
+
+</div>
 
 # MaraTUI
 
