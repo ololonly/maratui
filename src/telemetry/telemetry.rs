@@ -1,12 +1,17 @@
 // src/telemetry.rs
 use std::time::{Duration, Instant};
+use strum::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum MachineMode {
-    Coffee,  // '-' | '+'
-    SteamS,  // 'S'
-    SteamV,  // 'V'
-    SteamC,  // 'C' (as you described)
+    #[strum(to_string = "Coffee")]
+    Coffee, // '-' | '+'
+    #[strum(to_string = "Steam")]
+    SteamS, // 'S'
+    #[strum(to_string = "Steam")]
+    SteamV, // 'V'
+    #[strum(to_string = "Steam")]
+    SteamC, // 'C' (as you described)
     Offline, // 'X'
     Unknown(char),
 }

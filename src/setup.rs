@@ -1,4 +1,5 @@
 use crate::button::{Button, ButtonState};
+use crate::telemetry::TelemetryFrame;
 use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::{AnyIOPin, InterruptType, PinDriver};
 use esp_idf_svc::hal::prelude::*;
@@ -29,6 +30,8 @@ pub trait MaraUiApp {
 
     fn next_tab(&mut self);
     fn previous_tab(&mut self);
+
+    fn update_telemetry(&mut self, telemetry: TelemetryFrame);
 
     /// Run the application.
     ///

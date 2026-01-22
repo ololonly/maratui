@@ -1157,6 +1157,7 @@ dependencies = [
  "esp-idf-svc",
  "mipidsi",
  "mousefood",
+ "ratatui-core",
  "strum 0.27.2",
  "strum_macros 0.27.2",
  "tinyqoi",
@@ -1579,15 +1580,15 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.145"
+version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "402a6f66d8c709116cf22f558eab210f5a50187f702eb4d7e5ef38d9a7f1c79c"
+checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
  "itoa",
  "memchr",
- "ryu",
  "serde",
  "serde_core",
+ "zmij",
 ]
 
 [[package]]
@@ -1838,14 +1839,14 @@ dependencies = [
 
 [[package]]
 name = "tui-big-text"
-version = "0.8.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cb3cf7714229ca4503c1b94050bce7ae4f5bbcf9e5b3d24bee858f15ef23cef"
+checksum = "8b046cf880cb40db75567b60ca22dc38a4165ef490be6bfad5718b22bcb6aabf"
 dependencies = [
  "derive_builder",
  "font8x8",
- "itertools 0.14.0",
- "ratatui-core",
+ "itertools 0.13.0",
+ "ratatui",
 ]
 
 [[package]]
@@ -2273,3 +2274,9 @@ name = "wit-bindgen"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
+
+[[package]]
+name = "zmij"
+version = "1.0.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfcd145825aace48cff44a8844de64bf75feec3080e0aa5cdbde72961ae51a65"

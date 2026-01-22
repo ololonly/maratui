@@ -8,9 +8,11 @@ use mousefood::ratatui::layout::{Direction, Layout};
 use mousefood::ratatui::widgets::{
     Axis, Block, Chart, Dataset, GraphType, LegendPosition, Paragraph, Tabs, Wrap,
 };
+use serde_json::Serializer;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, FromRepr};
 use tinyqoi::Qoi;
+use tui_big_text::{BigText, PixelSize};
 
 #[derive(Clone, Copy, Default, Display, FromRepr, PartialEq, EnumIter)]
 enum Screen {
@@ -36,13 +38,13 @@ pub struct AppState {
     telemetry: Option<TelemetryFrame>,
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub struct UiState {
     screen: Screen,
-    // telemetry: Some,
+    telemetry: Option<TelemetryFrame>,
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub struct MaraUi {
     pub state: UiState,
 }
@@ -57,7 +59,7 @@ impl MaraUiApp for MaraUi {
         let selected_tab_index = self.state.screen as usize;
 
         let layout = Layout::default()
-            .direction(mousefood::ratatui::layout::Direction::Vertical)
+            .direction(Direction::Vertical)
             .spacing(1)
             .constraints([Constraint::Length(1), Constraint::Fill(1)])
             .split(frame.area());
@@ -89,19 +91,23 @@ impl MaraUiApp for MaraUi {
     fn previous_tab(&mut self) {
         self.state.screen = self.state.screen.previous();
     }
+
+    fn update_telemetry(&mut self, telemetry: TelemetryFrame) {
+        self.state.telemetry = Some(telemetry);
+    }
 }
 
 impl MaraUi {
-    fn render_tab_content(self, area: Rect, frame: &mut Frame) {
+    fn render_tab_content(&self, area: Rect, frame: &mut Frame) {
         match self.state.screen {
             Screen::Main => self.render_main(area, frame.buffer_mut()),
-            Screen::Dashboard => self.render_dashboard(area, frame.buffer_mut()),
+            Screen::Dashboard => self.render_dashboard(area, frame),
             Screen::Graphs => self.render_graphs(area, frame),
             Screen::Debug => self.render_debug(area, frame.buffer_mut()),
         }
     }
 
-    fn render_main(self, area: Rect, buf: &mut Buffer) {
+    fn render_main(&self, area: Rect, buf: &mut Buffer) {
         // Layout: pixel rat on left, text info on right
         let layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -122,7 +128,7 @@ impl MaraUi {
     }
 
     fn render_main_status(
-        self,
+        &self,
         area: Rect,
         buf: &mut Buffer,
         // snapshot: Option<&Snapshot>,
@@ -153,26 +159,58 @@ impl MaraUi {
             .render(area, buf);
     }
 
-    fn render_dashboard(self, area: Rect, buf: &mut Buffer) {
+    fn render_dashboard(&self, area: Rect, frame: &mut Frame) {
+        let buf = frame.buffer_mut();
         let t_frame = parse_uart_line("C1.10,037,138,035,0000,1,0").expect("Not parsed!");
+        let t_frame_low_water = parse_uart_line("C1.10,037,L65,035,0000,0,0").expect("Not parsed!");
 
-        let [top_row, bottom_row] = Layout::vertical([Constraint::Fill(1); 2]).areas(area);
+        let [col1, col2, col3] = Layout::horizontal([Constraint::Fill(1); 3]).areas(area);
 
-        let top_row_areas = Layout::horizontal([Constraint::Fill(1); 4]).split(top_row);
-        let bottom_row_areas = Layout::horizontal([Constraint::Fill(1); 4]).split(bottom_row);
+        let col1_areas = Layout::vertical([Constraint::Fill(1); 3]).split(col1);
+        let col3_areas = Layout::horizontal([Constraint::Fill(1); 3]).split(col3);
 
         if let Some(tt) = t_frame.boiler_target_c {
             Paragraph::new(Line::from(format!("Target {tt}")))
                 .wrap(Wrap { trim: true })
                 .centered()
                 .block(Block::default())
-                .render(top_row_areas[0], buf);
+                .render(col1_areas[0], buf);
             Paragraph::new(Line::from(format!("Current {}", t_frame.boiler_now_c)))
                 .wrap(Wrap { trim: true })
                 .centered()
                 .block(Block::default())
-                .render(bottom_row_areas[0], buf);
+                .render(col1_areas[1], buf);
+            Paragraph::new(Line::from(format!("Current HX {}", t_frame.hx_now_c)))
+                .wrap(Wrap { trim: true })
+                .centered()
+                .block(Block::default())
+                .render(col1_areas[2], buf);
         }
+
+        let big_text = BigText::builder()
+            .pixel_size(PixelSize::HalfWidth)
+            .centered()
+            .style(Style::default().yellow())
+            .lines(vec!["138".into()])
+            .build();
+
+        Paragraph::new(Line::from(format!("Target {}", t_frame.mode.to_string())))
+            .wrap(Wrap { trim: true })
+            .centered()
+            .block(Block::default())
+            .render(col1_areas[0], buf);
+        Paragraph::new(Line::from(format!("Heating {}", t_frame.heating_on)))
+            .wrap(Wrap { trim: true })
+            .centered()
+            .block(Block::default())
+            .render(col1_areas[1], buf);
+        Paragraph::new(Line::from(format!("Pump {}", t_frame.pump_on)))
+            .wrap(Wrap { trim: true })
+            .centered()
+            .block(Block::default())
+            .render(col1_areas[2], buf);
+
+        frame.render_widget(big_text, col2);
     }
 
     fn demo_dataset() -> Vec<(f64, f64)> {
@@ -199,7 +237,7 @@ impl MaraUi {
         data
     }
 
-    fn render_graphs(self, area: Rect, frame: &mut Frame) {
+    fn render_graphs(&self, area: Rect, frame: &mut Frame) {
         let points = Self::demo_dataset();
         let points2 = Self::demo_dataset2();
 
@@ -237,8 +275,10 @@ impl MaraUi {
 
         frame.render_widget(chart, area);
     }
-    fn render_debug(self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new("Debug").render(area, buf);
+    fn render_debug(&self, area: Rect, buf: &mut Buffer) {
+        let uart_line = "C1.10,037,L65,035,0000,0,0";
+
+        Paragraph::new(vec![Line::from(format!("UART: {}", uart_line))]).render(area, buf);
     }
 }
 
