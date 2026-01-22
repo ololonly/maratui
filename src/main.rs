@@ -115,7 +115,7 @@ impl MaraUi {
 
         // Left area: render QOI image as Ratatui widget
         let rat_area = layout[0];
-        let data = include_bytes!("../assets/rat_chef.qoi");
+        let data = include_bytes!("../assets/rat_barista.qoi");
         let qoi = Qoi::new(data).unwrap();
         let image_widget = QoiImage::new(&qoi);
 
