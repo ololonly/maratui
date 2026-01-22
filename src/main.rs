@@ -166,7 +166,7 @@ impl MaraUi {
         let [col1, col2, col3] = Layout::horizontal([Constraint::Fill(1); 3]).areas(area);
 
         let col1_areas = Layout::vertical([Constraint::Fill(1); 3]).split(col1);
-        let col3_areas = Layout::horizontal([Constraint::Fill(1); 3]).split(col3);
+        let col3_areas = Layout::vertical([Constraint::Fill(1); 3]).split(col3);
 
         if let Some(tt) = t_frame.boiler_target_c {
             Paragraph::new(Line::from(format!("Target {tt}")))
