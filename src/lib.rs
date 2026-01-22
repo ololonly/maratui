@@ -6,3 +6,5 @@ pub mod button;
 
 /// QOI image widget for Ratatui.
 pub mod qoi_widget;
+
+pub mod telemetry;

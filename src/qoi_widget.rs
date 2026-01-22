@@ -1,4 +1,3 @@
-use mousefood::embedded_graphics::image::ImageDrawable;
 use mousefood::embedded_graphics::pixelcolor::{Rgb888, RgbColor};
 use mousefood::embedded_graphics::prelude::OriginDimensions;
 use mousefood::prelude::*;

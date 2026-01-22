@@ -10,6 +10,7 @@ use mipidsi::models::ST7789;
 use mipidsi::options::{ColorInversion, Orientation, Rotation};
 use mousefood::embedded_graphics::draw_target::DrawTarget;
 use mousefood::embedded_graphics::prelude::*;
+use mousefood::fonts;
 use mousefood::prelude::*;
 
 /// Offset to align the display correctly.
@@ -106,6 +107,10 @@ fn run_app(mut app: impl MaraUiApp) {
     let mut button2_state = ButtonState::default();
 
     // Setup Mousefood and Ratatui
+    // let config = EmbeddedBackendConfig {
+    //     font_regular: fonts::MONO_7X14,
+    //     ..Default::default()
+    // };
     let backend = EmbeddedBackend::new(&mut display, Default::default());
     let mut terminal = Terminal::new(backend).unwrap();
 

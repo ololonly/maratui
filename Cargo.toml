@@ -1,5 +1,5 @@
 [package]
-name = "ratatui-mousefood-template"
+name = "maratui"
 version = "0.1.0"
 edition = "2024"
 
@@ -10,6 +10,7 @@ mousefood = "0.2.1"
 strum = "0.27.2"
 strum_macros = "0.27.2"
 tinyqoi = "0.2.0"
+tui-big-text = "0.8.1"
 
 [build-dependencies]
 embuild = { version = "0.33", features = ["espidf"] }
