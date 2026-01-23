@@ -168,18 +168,10 @@ fn run_app(mut app: impl MaraUiApp) {
             app.update_telemetry(telemetry);
         }
 
-        // Draw the UI only every 5 iterations to reduce load
-        // This gives more time for UART task and prevents watchdog
-        if frame_counter % 5 == 0 {
-            terminal
-                .draw(|f| {
-                    app.draw(f);
-                })
-                .unwrap();
-        }
-
-        // Longer delay to prevent watchdog and allow other tasks to run
-        // This is critical - watchdog needs time to reset
-        Ets::delay_ms(50);
+        terminal
+            .draw(|f| {
+                app.draw(f);
+            })
+            .unwrap();
     }
 }
