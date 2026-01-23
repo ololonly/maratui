@@ -1,5 +1,5 @@
 <p align="center">
-    ![Rat Chef](assets/rat_barista.png)
+    <img src="assets/rat_barista.png" alt="Rat Chef">
     <br>
     <br>
     <a href="https://github.com/ratatui/ratatui">
