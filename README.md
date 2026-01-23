@@ -15,13 +15,11 @@ MaraTUI provides a multi-screen interface for monitoring and controlling coffee 
 - **Dashboard**: Real-time telemetry (temperatures, heating, pump status)
 - **Graphs**: Temperature charts and data visualization
 - **Debug**: UART communication monitoring
+- Real-time telemetry parsing from UART
+- Interactive button controls for navigation
+- Embedded display support (ESP32)
 
 ## What's coming
-
-- Real-time telemetry parsing from UART
-- Interactive button controls
-- Temperature graph visualization
-- System status monitoring
-- Embedded display support (ESP32)
+- UI adjustments: lifetime graphs, design improvements, animations
 - Configurable Home Assistant integration (cup count data)
 - MQTT broker integration (telemetry data and events broadcasting)
