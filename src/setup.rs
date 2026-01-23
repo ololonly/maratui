@@ -6,6 +6,7 @@ use esp_idf_svc::hal::gpio::{AnyIOPin, InterruptType, PinDriver};
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::spi::config::MODE_3;
 use esp_idf_svc::hal::spi::{SpiConfig, SpiDeviceDriver, SpiDriverConfig};
+use log::{info, warn};
 use mipidsi::Builder;
 use mipidsi::interface::SpiInterface;
 use mipidsi::models::ST7789;
@@ -112,19 +113,39 @@ fn run_app(mut app: impl MaraUiApp) {
 
     let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
 
-    let uart_reader = UartReader::new(
-        peripherals.uart2,
+    info!("Initializing UART1: TX=GPIO17, RX=GPIO22, baud=9600");
+    let uart_reader = match UartReader::new(
+        peripherals.uart1,
         peripherals.pins.gpio17,
         peripherals.pins.gpio22,
-    )
-    .unwrap();
+    ) {
+        Ok(reader) => {
+            info!("UART1 initialized successfully");
+            reader
+        }
+        Err(e) => {
+            warn!("Failed to initialize UART1: {:?}", e);
+            panic!("UART initialization failed");
+        }
+    };
 
-    uart_reader
-        .spawn_uart_task(tx)
-        .expect("Failed to spawn UART task");
+    info!("Spawning UART task");
+    match uart_reader.spawn_uart_task(tx) {
+        Ok(()) => info!("UART task spawn command completed"),
+        Err(e) => {
+            warn!("Failed to spawn UART task: {:?}", e);
+            panic!("UART task spawn failed");
+        }
+    }
 
+    // Give UART task time to start
+    Ets::delay_ms(100);
+
+    let mut frame_counter = 0u32;
     // Enter main event loop
     loop {
+        frame_counter += 1;
+
         // Handle button states
         let button1_pressed = button1.is_low();
         let button2_pressed = button2.is_low();
@@ -142,15 +163,23 @@ fn run_app(mut app: impl MaraUiApp) {
             });
         }
 
-        if let Ok(telemetry) = rx.try_recv() {
+        // Check for UART data (non-blocking)
+        while let Ok(telemetry) = rx.try_recv() {
             app.update_telemetry(telemetry);
         }
 
-        // Draw the UI
-        terminal
-            .draw(|f| {
-                app.draw(f);
-            })
-            .unwrap();
+        // Draw the UI only every 5 iterations to reduce load
+        // This gives more time for UART task and prevents watchdog
+        if frame_counter % 5 == 0 {
+            terminal
+                .draw(|f| {
+                    app.draw(f);
+                })
+                .unwrap();
+        }
+
+        // Longer delay to prevent watchdog and allow other tasks to run
+        // This is critical - watchdog needs time to reset
+        Ets::delay_ms(50);
     }
 }

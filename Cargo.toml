@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 esp-idf-svc = { version = "0.51", features = ["critical-section"] }
+log = "0.4"
 mipidsi = "0.9.0"
 mousefood = "0.2.1"
 ratatui-core = "0.1.0"

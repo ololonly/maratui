@@ -160,8 +160,8 @@ impl MaraUi {
 
     fn render_dashboard(&self, area: Rect, frame: &mut Frame) {
         let buf = frame.buffer_mut();
-        let t_frame = parse_uart_line("C1.10,037,138,035,0000,1,0").expect("Not parsed!");
-        let t_frame_low_water = parse_uart_line("C1.10,037,L65,035,0000,0,0").expect("Not parsed!");
+
+        let t_frame = self.state.telemetry.as_ref().unwrap();
 
         let [col1, col2, col3] = Layout::horizontal([Constraint::Fill(1); 3]).areas(area);
 
@@ -193,7 +193,7 @@ impl MaraUi {
             .lines(vec!["138".into()])
             .build();
 
-        Paragraph::new(Line::from(format!("Target {}", t_frame.mode.to_string())))
+        Paragraph::new(Line::from(format!("Mode {}", t_frame.mode.to_string())))
             .wrap(Wrap { trim: true })
             .centered()
             .block(Block::default())

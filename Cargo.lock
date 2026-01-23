@@ -1155,6 +1155,7 @@ version = "0.1.0"
 dependencies = [
  "embuild",
  "esp-idf-svc",
+ "log",
  "mipidsi",
  "mousefood",
  "ratatui-core",
