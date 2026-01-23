@@ -1,5 +1,6 @@
 use crate::button::{Button, ButtonState};
 use crate::telemetry::TelemetryFrame;
+use crate::uart_reader::{self, UartReader};
 use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::{AnyIOPin, InterruptType, PinDriver};
 use esp_idf_svc::hal::prelude::*;
@@ -44,15 +45,6 @@ pub trait MaraUiApp {
     }
 }
 
-/// Run the application with the provided [`App`] implementation.
-///
-/// It initializes the hardware, sets up the display and buttons,
-/// and enters the main event loop.
-///
-/// Please note that this function is blocking and will not return.
-/// It is meant to be called once at the start of the program (e.g., in `main`).
-///
-/// Errors are not handled and will cause a panic if they occur.
 fn run_app(mut app: impl MaraUiApp) {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
@@ -100,6 +92,7 @@ fn run_app(mut app: impl MaraUiApp) {
         .clear(Rgb565::BLACK)
         .expect("Failed to clear display");
 
+    // Draw the UI
     // Configure buttons
     let mut button1 = PinDriver::input(peripherals.pins.gpio35).unwrap();
     button1.set_interrupt_type(InterruptType::NegEdge).unwrap();
@@ -116,6 +109,19 @@ fn run_app(mut app: impl MaraUiApp) {
     // };
     let backend = EmbeddedBackend::new(&mut display, Default::default());
     let mut terminal = Terminal::new(backend).unwrap();
+
+    let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
+
+    let uart_reader = UartReader::new(
+        peripherals.uart2,
+        peripherals.pins.gpio17,
+        peripherals.pins.gpio22,
+    )
+    .unwrap();
+
+    uart_reader
+        .spawn_uart_task(tx)
+        .expect("Failed to spawn UART task");
 
     // Enter main event loop
     loop {
@@ -134,6 +140,10 @@ fn run_app(mut app: impl MaraUiApp) {
             button2_state.update(button2_pressed, |press_type| {
                 app.handle_press(Button::Button2(press_type));
             });
+        }
+
+        if let Ok(telemetry) = rx.try_recv() {
+            app.update_telemetry(telemetry);
         }
 
         // Draw the UI

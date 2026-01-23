@@ -2,7 +2,7 @@
 use std::time::{Duration, Instant};
 use strum::Display;
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Display, Default, Clone, Copy, PartialEq, Eq)]
 pub enum MachineMode {
     #[strum(to_string = "Coffee")]
     Coffee, // '-' | '+'
@@ -12,6 +12,7 @@ pub enum MachineMode {
     SteamV, // 'V'
     #[strum(to_string = "Steam")]
     SteamC, // 'C' (as you described)
+    #[default]
     Offline, // 'X'
     Unknown(char),
 }
@@ -29,8 +30,9 @@ impl MachineMode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct TelemetryFrame {
+    pub raw_string: String,
     pub mode: MachineMode,
     pub sw_version: String,           // e.g. "1.10"
     pub boiler_now_c: u16,            // e.g. 37
@@ -102,7 +104,10 @@ pub fn parse_uart_line(line: &str) -> Result<TelemetryFrame, ParseError> {
     let heating_on = parse_bool01(parts[4], "heating_on")?;
     let pump_on = parse_bool01(parts[5], "pump_on")?;
 
+    let raw_string = line.to_string();
+
     Ok(TelemetryFrame {
+        raw_string,
         mode,
         sw_version,
         boiler_now_c,

@@ -275,9 +275,12 @@ impl MaraUi {
         frame.render_widget(chart, area);
     }
     fn render_debug(&self, area: Rect, buf: &mut Buffer) {
-        let uart_line = "C1.10,037,L65,035,0000,0,0";
+        let text = match &self.state.telemetry {
+            Some(telemetry) => format!("UART: {}", telemetry.raw_string),
+            None => "UART: No data (waiting for connection...)".to_string(),
+        };
 
-        Paragraph::new(vec![Line::from(format!("UART: {}", uart_line))]).render(area, buf);
+        Paragraph::new(vec![Line::from(text)]).render(area, buf);
     }
 }
 
