@@ -1,30 +1,16 @@
 use maratui::button::{Button, ButtonPressType};
 use maratui::qoi_widget::QoiImage;
+use maratui::screens::{Rat, Screen, screen::Board};
 use maratui::setup::MaraUiApp;
 use maratui::telemetry::TelemetryFrame;
-use maratui::telemetry::telemetry::parse_uart_line;
 use mousefood::prelude::*;
 use mousefood::ratatui::layout::{Direction, Layout};
 use mousefood::ratatui::widgets::{
     Axis, Block, Chart, Dataset, GraphType, LegendPosition, Paragraph, Tabs, Wrap,
 };
 use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter, FromRepr};
 use tinyqoi::Qoi;
 use tui_big_text::{BigText, PixelSize};
-
-#[derive(Clone, Copy, Default, Display, FromRepr, PartialEq, EnumIter)]
-enum Screen {
-    #[default]
-    #[strum(to_string = "Main")]
-    Main,
-    #[strum(to_string = "Dashboard")]
-    Dashboard,
-    #[strum(to_string = "Graphs")]
-    Graphs,
-    #[strum(to_string = "Debug")]
-    Debug,
-}
 
 /// Application state.
 ///
@@ -98,12 +84,15 @@ impl MaraUiApp for MaraUi {
 
 impl MaraUi {
     fn render_tab_content(&self, area: Rect, frame: &mut Frame) {
-        match self.state.screen {
-            Screen::Main => self.render_main(area, frame.buffer_mut()),
-            Screen::Dashboard => self.render_dashboard(area, frame),
-            Screen::Graphs => self.render_graphs(area, frame),
-            Screen::Debug => self.render_debug(area, frame.buffer_mut()),
-        }
+        let current_board = match self.state.screen {
+            Screen::Main => Rat::new(),
+            // Screen::Dashboard => self.render_dashboard(area, frame),
+            // Screen::Graphs => self.render_graphs(area, frame),
+            // Screen::Debug => self.render_debug(area, frame.buffer_mut()),
+            _ => return,
+        };
+
+        Board::render(&current_board, area, frame);
     }
 
     fn render_main(&self, area: Rect, buf: &mut Buffer) {
@@ -281,26 +270,6 @@ impl MaraUi {
         };
 
         Paragraph::new(vec![Line::from(text)]).render(area, buf);
-    }
-}
-
-impl Screen {
-    fn previous(self) -> Self {
-        let current_index: usize = self as usize;
-        let total = Screen::iter().count();
-        let previous_index = if current_index == 0 {
-            total - 1 // Wrap to last
-        } else {
-            current_index - 1
-        };
-        Self::from_repr(previous_index).unwrap_or(self)
-    }
-
-    fn next(self) -> Self {
-        let current_index = self as usize;
-        let total = Screen::iter().count();
-        let next_index = (current_index + 1) % total; // Wrap to 0 after last
-        Self::from_repr(next_index).unwrap_or(self)
     }
 }
 
