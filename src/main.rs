@@ -115,11 +115,13 @@ impl MaraUi {
 
         // Left area: render QOI image as Ratatui widget
         let rat_area = layout[0];
-        let data = include_bytes!("../assets/rat_barista.qoi");
-        let qoi = Qoi::new(data).unwrap();
-        let image_widget = QoiImage::new(&qoi);
+        // let data = include_bytes!("../assets/rat_barista.qoi");
+        // let qoi = Qoi::new(data).unwrap();
+        // let image_widget = QoiImage::new(&qoi);
 
-        image_widget.render(rat_area, buf);
+        // image_widget.render(rat_area, buf);
+
+        Paragraph::new(Line::from("Hello, world!")).render(rat_area, buf);
 
         // Render status text on the right
         let status_area = layout[1];
