@@ -7,9 +7,10 @@ edition = "2024"
 display-interface-spi = "0.5.0"
 esp-idf-svc = { version = "0.51", features = ["critical-section"] }
 ili9341 = "0.6.0"
+libc = "0.2"
 log = "0.4"
-mipidsi = "0.9.0"
-mousefood = "0.2.1"
+mousefood = {path = "/home/ololonly/git/mousefood/mousefood" }
+ratatui-widgets = "0.3.0"
 ratatui-core = "0.1.0"
 strum = "0.27.2"
 strum_macros = "0.27.2"

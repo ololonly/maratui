@@ -1,12 +1,22 @@
 use maratui::button::{Button, ButtonPressType};
-use maratui::qoi_widget::QoiImage;
+// use maratui::qoi_widget::QoiImage;
 use maratui::setup::MaraUiApp;
 use maratui::telemetry::TelemetryFrame;
 use maratui::telemetry::telemetry::parse_uart_line;
-use mousefood::prelude::*;
-use mousefood::ratatui::layout::{Direction, Layout};
-use mousefood::ratatui::widgets::{
-    Axis, Block, Chart, Dataset, GraphType, LegendPosition, Paragraph, Tabs, Wrap,
+use ratatui_core::buffer::Buffer;
+use ratatui_core::layout::{Constraint, Direction, Layout, Rect};
+use ratatui_core::style::{Color, Style, Stylize};
+use ratatui_core::symbols;
+use ratatui_core::terminal::Frame;
+use ratatui_core::text::Line;
+use ratatui_core::widgets::Widget;
+use ratatui_widgets::block::Padding;
+use ratatui_widgets::{
+    block::Block,
+    chart::{Axis, Chart, Dataset, GraphType, LegendPosition},
+    paragraph::Paragraph,
+    paragraph::Wrap,
+    tabs::Tabs,
 };
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, FromRepr};
@@ -51,7 +61,6 @@ pub struct MaraUi {
 /// The main application trait that you need to implement.
 impl MaraUiApp for MaraUi {
     /// Draw the UI frame.
-    ///
     /// This is being called in the main loop to render the UI.
     fn draw(&self, frame: &mut Frame) {
         let titles = Screen::iter().map(|s| s.to_string());
@@ -142,21 +151,16 @@ impl MaraUi {
 
         // Split by newlines and create a Line for each part
         for line_text in status.split('\n') {
-            lines.push(mousefood::ratatui::text::Line::from(line_text));
+            lines.push(Line::from(line_text));
         }
 
         // Mode and cups
         let mode_str = "COFFEE";
-        lines.push(mousefood::ratatui::text::Line::from(""));
-        lines.push(mousefood::ratatui::text::Line::from(format!(
-            "Mode: {mode_str}"
-        )));
+        lines.push(Line::from(""));
+        lines.push(Line::from(format!("Mode: {mode_str}")));
 
         Paragraph::new(lines)
-            .block(
-                Block::default()
-                    .padding(mousefood::ratatui::widgets::block::Padding::new(1, 0, 1, 0)),
-            )
+            .block(Block::default().padding(Padding::new(1, 0, 1, 0)))
             .render(area, buf);
     }
 
@@ -191,7 +195,6 @@ impl MaraUi {
         let big_text = BigText::builder()
             .pixel_size(PixelSize::HalfWidth)
             .centered()
-            .style(Style::default().yellow())
             .lines(vec!["138".into()])
             .build();
 
@@ -211,7 +214,7 @@ impl MaraUi {
             .block(Block::default())
             .render(col3_areas[2], buf);
 
-        frame.render_widget(big_text, col2);
+        // frame.render_widget(big_text, col2);
     }
 
     fn demo_dataset() -> Vec<(f64, f64)> {

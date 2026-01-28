@@ -15,12 +15,8 @@ use ili9341::{DisplaySize240x320, Ili9341, Orientation};
 use log::{info, warn};
 use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor, Size};
 use mousefood::embedded_graphics::primitives::Rectangle;
-// use mipidsi::models::{ILI9341Rgb565, ST7789};
-// use mipidsi::options::{ColorInversion, Orientation, Rotation};
-// use mousefood::embedded_graphics::draw_target::DrawTarget;
-// use mousefood::embedded_graphics::prelude::*;
-// use mousefood::fonts;
 use mousefood::prelude::*;
+use ratatui_core::terminal::{Frame, Terminal};
 
 /// Offset to align the display correctly.
 const DISPLAY_OFFSET: (u16, u16) = (0, 0);
@@ -56,36 +52,6 @@ fn run_app(mut app: impl MaraUiApp) {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 
-    // let peripherals = Peripherals::take().unwrap();
-
-    // let rst = PinDriver::output(peripherals.pins.gpio13).unwrap();
-    // let dc = PinDriver::output(peripherals.pins.gpio2).unwrap();
-    // let sclk = peripherals.pins.gpio22;
-    // let sdo = peripherals.pins.gpio12;
-    // // For display we only need MOSI (write-only), disable MISO to avoid full-duplex limits
-    // let sdi = Option::<AnyIOPin>::None;
-    // let cs = Some(peripherals.pins.gpio15);
-    // let driver_config = Default::default();
-    // // Lower initial SPI frequency to stay below full-duplex limit
-    // let spi_config = SpiConfig::default().baudrate(20u32.MHz().into());
-    // // #region agent log
-    // agent_debug_log(
-    //     "H1",
-    //     "src/setup.rs:63",
-    //     "before SpiDeviceDriver::new_single",
-    //     r#"{"baud_mhz":20,"mode":"half_or_write_only"}"#,
-    // );
-    // // #endregion
-    // let spi = match SpiDeviceDriver::new_single(
-    //     peripherals.spi2,
-    //     sclk,
-    //     sdo,
-    //     sdi,
-    //     cs,
-    //     &driver_config,
-    //     &spi_config,
-    // );
-
     let peripherals = Peripherals::take().unwrap();
 
     let spi_p = peripherals.spi2; // SPI2 is used for the display
@@ -104,17 +70,7 @@ fn run_app(mut app: impl MaraUiApp) {
     let spi = SpiDeviceDriver::new_single(spi_p, sclk, mosi, sdi, cs, &driver_config, &spi_config)
         .unwrap();
 
-    // let di = SPIInterface::new(spi, dc);
     let di = SPIInterface::new(spi, dc);
-
-    // let mut display = Ili9341::new(
-    //     di,
-    //     rst,
-    //     &mut Delay::new(100),
-    //     Orientation::Landscape,
-    //     DisplaySize240x320,
-    // )
-    // .unwrap();
 
     let mut display = Ili9341::new(
         di,
@@ -134,43 +90,6 @@ fn run_app(mut app: impl MaraUiApp) {
     // Turn on display backlight
     // let mut backlight = PinDriver::output(peripherals.pins.gpio21).unwrap();
     // backlight.set_high().unwrap();
-
-    // // Configure SPI
-    // let config = SpiConfig::new()
-    //     .write_only(true)
-    //     .baudrate(80u32.MHz().into())
-    //     .data_mode(MODE_3);
-    // let spi_device = SpiDeviceDriver::new_single(
-    //     peripherals.spi2,
-    //     peripherals.pins.gpio22,
-    //     peripherals.pins.gpio12,
-    //     Some(peripherals.pins.gpio17),
-    //     Some(peripherals.pins.gpio15),
-    //     &SpiDriverConfig::new(),
-    //     &config,
-    // )
-    // .unwrap();
-    // let buffer = Box::leak(Box::new([0_u8; 4096]));
-    // let spi_interface = SpiInterface::new(
-    //     spi_device,
-    //     PinDriver::output(peripherals.pins.gpio2).unwrap(),
-    //     buffer,
-    // );
-
-    // // Configure display
-    // let mut delay = Ets;
-    // let mut display = Builder::new(ILI9341Rgb565, spi_interface)
-    //     .invert_colors(ColorInversion::Inverted)
-    //     .reset_pin(PinDriver::output(peripherals.pins.gpio13).unwrap())
-    //     .display_offset(DISPLAY_OFFSET.0, DISPLAY_OFFSET.1)
-    //     .display_size(DISPLAY_SIZE.0, DISPLAY_SIZE.1)
-    //     .orientation(Orientation::new().rotate(Rotation::Deg0))
-    //     .init(&mut delay)
-    //     .expect("Failed to init display");
-
-    // display
-    //     .clear(Rgb565::BLACK)
-    //     .expect("Failed to clear display");
 
     // Draw the UI
     // Configure buttons
