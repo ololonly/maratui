@@ -1,27 +1,21 @@
 use maratui::button::{Button, ButtonPressType};
-// use maratui::qoi_widget::QoiImage;
+use maratui::qoi_widget::QoiImage;
 use maratui::setup::MaraUiApp;
 use maratui::telemetry::TelemetryFrame;
-use maratui::telemetry::telemetry::parse_uart_line;
-use ratatui_core::buffer::Buffer;
-use ratatui_core::layout::{Constraint, Direction, Layout, Rect};
-use ratatui_core::style::{Color, Style, Stylize};
-use ratatui_core::symbols;
-use ratatui_core::terminal::Frame;
-use ratatui_core::text::Line;
-use ratatui_core::widgets::Widget;
-use ratatui_widgets::block::Padding;
-use ratatui_widgets::{
-    block::Block,
-    chart::{Axis, Chart, Dataset, GraphType, LegendPosition},
-    paragraph::Paragraph,
-    paragraph::Wrap,
-    tabs::Tabs,
+use ratatui::Frame;
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Style, Stylize};
+use ratatui::symbols;
+use ratatui::text::Line;
+use ratatui::widgets::{
+    Axis, Block, Chart, Dataset, GraphType, LegendPosition, Paragraph, Tabs, Wrap,
 };
+use ratatui::widgets::{Padding, Widget};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, FromRepr};
 use tinyqoi::Qoi;
-use tui_big_text::{BigText, PixelSize};
+use tui_widgets::big_text::{BigText, PixelSize};
 
 #[derive(Clone, Copy, Default, Display, FromRepr, PartialEq, EnumIter)]
 enum Screen {
@@ -124,13 +118,11 @@ impl MaraUi {
 
         // Left area: render QOI image as Ratatui widget
         let rat_area = layout[0];
-        // let data = include_bytes!("../assets/rat_barista.qoi");
-        // let qoi = Qoi::new(data).unwrap();
-        // let image_widget = QoiImage::new(&qoi);
+        let data = include_bytes!("../assets/rat_barista.qoi");
+        let qoi = Qoi::new(data).unwrap();
+        let image_widget = QoiImage::new(&qoi);
 
-        // image_widget.render(rat_area, buf);
-
-        Paragraph::new(Line::from("Hello, world!")).render(rat_area, buf);
+        image_widget.render(rat_area, buf);
 
         // Render status text on the right
         let status_area = layout[1];
@@ -214,7 +206,7 @@ impl MaraUi {
             .block(Block::default())
             .render(col3_areas[2], buf);
 
-        // frame.render_widget(big_text, col2);
+        frame.render_widget(big_text, col2);
     }
 
     fn demo_dataset() -> Vec<(f64, f64)> {
@@ -222,7 +214,7 @@ impl MaraUi {
 
         for i in 0..360 {
             let x = i as f64;
-            let y = (i / 2) as f64; // псевдо-температура
+            let y = (i / 2) as f64;
             data.push((x, y));
         }
 
@@ -234,7 +226,7 @@ impl MaraUi {
 
         for i in 0..360 {
             let x = i as f64;
-            let y = 128 as f64; // псевдо-температура
+            let y = 128 as f64;
             data.push((x, y));
         }
 

@@ -1,28 +1,18 @@
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::pin::Pin;
-
 use crate::button::{Button, ButtonState};
 use crate::telemetry::TelemetryFrame;
-use crate::uart_reader::{self, UartReader};
+use crate::uart_reader::UartReader;
 use display_interface_spi::SPIInterface;
-use esp_idf_svc::hal::delay::{Delay, Ets};
+use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::{AnyIOPin, InterruptType, PinDriver};
 use esp_idf_svc::hal::prelude::*;
-use esp_idf_svc::hal::spi::config::MODE_3;
 use esp_idf_svc::hal::spi::{SpiConfig, SpiDeviceDriver, SpiDriverConfig};
 use ili9341::{DisplaySize240x320, Ili9341, Orientation};
 use log::{info, warn};
 use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor, Size};
 use mousefood::embedded_graphics::primitives::Rectangle;
+use mousefood::fonts::*;
 use mousefood::prelude::*;
-use ratatui_core::terminal::{Frame, Terminal};
-
-/// Offset to align the display correctly.
-const DISPLAY_OFFSET: (u16, u16) = (0, 0);
-
-/// Display size in pixels.
-const DISPLAY_SIZE: (u16, u16) = (240, 320);
+use ratatui::{Frame, Terminal};
 
 /// Application trait to be implemented by the user.
 pub trait MaraUiApp {
@@ -76,17 +66,18 @@ fn run_app(mut app: impl MaraUiApp) {
         di,
         rst,
         &mut esp_idf_svc::hal::delay::FreeRtos,
-        Orientation::Portrait,
+        Orientation::Landscape,
         DisplaySize240x320,
     )
     .unwrap();
 
     display
         .fill_solid(
-            &Rectangle::new(Point::new(0, 0), Size::new(240, 320)),
-            Rgb565::BLUE,
+            &Rectangle::new(Point::new(0, 0), Size::new(320, 240)),
+            Rgb565::BLACK,
         )
         .unwrap();
+
     // Turn on display backlight
     // let mut backlight = PinDriver::output(peripherals.pins.gpio21).unwrap();
     // backlight.set_high().unwrap();
@@ -101,35 +92,42 @@ fn run_app(mut app: impl MaraUiApp) {
     button2.set_interrupt_type(InterruptType::NegEdge).unwrap();
     let mut button2_state = ButtonState::default();
 
-    let backend = EmbeddedBackend::new(&mut display, Default::default());
+    let config = EmbeddedBackendConfig {
+        font_regular: MONO_7X14,
+        font_bold: Some(MONO_7X14_BOLD),
+        font_italic: Some(MONO_7X14),
+        ..Default::default()
+    };
+
+    let backend = EmbeddedBackend::new(&mut display, config);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    // let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
+    let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
 
-    // info!("Initializing UART1: TX=GPIO17, RX=GPIO22, baud=9600");
-    // let uart_reader = match UartReader::new(
-    //     peripherals.uart1,
-    //     peripherals.pins.gpio21,
-    //     peripherals.pins.gpio22,
-    // ) {
-    //     Ok(reader) => {
-    //         info!("UART1 initialized successfully");
-    //         reader
-    //     }
-    //     Err(e) => {
-    //         warn!("Failed to initialize UART1: {:?}", e);
-    //         panic!("UART initialization failed");
-    //     }
-    // };
+    info!("Initializing UART1: TX=GPIO17, RX=GPIO22, baud=9600");
+    let uart_reader = match UartReader::new(
+        peripherals.uart1,
+        peripherals.pins.gpio21,
+        peripherals.pins.gpio22,
+    ) {
+        Ok(reader) => {
+            info!("UART1 initialized successfully");
+            reader
+        }
+        Err(e) => {
+            warn!("Failed to initialize UART1: {:?}", e);
+            panic!("UART initialization failed");
+        }
+    };
 
-    // info!("Spawning UART task");
-    // match uart_reader.spawn_uart_task(tx) {
-    //     Ok(()) => info!("UART task spawn command completed"),
-    //     Err(e) => {
-    //         warn!("Failed to spawn UART task: {:?}", e);
-    //         panic!("UART task spawn failed");
-    //     }
-    // }
+    info!("Spawning UART task");
+    match uart_reader.spawn_uart_task(tx) {
+        Ok(()) => info!("UART task spawn command completed"),
+        Err(e) => {
+            warn!("Failed to spawn UART task: {:?}", e);
+            panic!("UART task spawn failed");
+        }
+    }
 
     // Give UART task time to start
     Ets::delay_ms(100);
@@ -140,28 +138,27 @@ fn run_app(mut app: impl MaraUiApp) {
         frame_counter += 1;
 
         // Handle button states
-        // let button1_pressed = button1.is_low();
-        // let button2_pressed = button2.is_low();
+        let button1_pressed = button1.is_low();
+        let button2_pressed = button2.is_low();
 
-        // if button1_pressed && button2_pressed {
-        //     app.handle_press(Button::Both);
-        //     Ets::delay_ms(100);
-        // } else {
-        //     button1_state.update(button1_pressed, |press_type| {
-        //         app.handle_press(Button::Button1(press_type));
-        //     });
+        if button1_pressed && button2_pressed {
+            app.handle_press(Button::Both);
+            Ets::delay_ms(100);
+        } else {
+            button1_state.update(button1_pressed, |press_type| {
+                app.handle_press(Button::Button1(press_type));
+            });
 
-        //     button2_state.update(button2_pressed, |press_type| {
-        //         app.handle_press(Button::Button2(press_type));
-        //     });
-        // }
+            button2_state.update(button2_pressed, |press_type| {
+                app.handle_press(Button::Button2(press_type));
+            });
+        }
 
-        // // Check for UART data (non-blocking)
-        // while let Ok(telemetry) = rx.try_recv() {
-        //     app.update_telemetry(telemetry);
-        // }
+        //Check for UART data (non-blocking)
+        while let Ok(telemetry) = rx.try_recv() {
+            app.update_telemetry(telemetry);
+        }
 
-        info!("Drawing frame");
         terminal
             .draw(|f| {
                 app.draw(f);
