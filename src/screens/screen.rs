@@ -1,4 +1,5 @@
-use mousefood::{prelude::Rect, ratatui::Frame};
+use ratatui::Frame;
+use ratatui::layout::Rect;
 use strum::IntoEnumIterator;
 use strum::{Display, EnumIter, FromRepr};
 

@@ -1,7 +1,9 @@
 use crate::qoi_widget::QoiImage;
-use mousefood::prelude::*;
-use mousefood::ratatui::layout::{Direction, Layout};
-use mousefood::ratatui::widgets::{Block, Padding, Paragraph};
+use ratatui::Frame;
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::text::Line;
+use ratatui::widgets::{Block, Padding, Paragraph, Widget};
 use tinyqoi::Qoi;
 
 use crate::{screens::screen::Board, telemetry::TelemetryFrame};
@@ -19,6 +21,12 @@ impl Board for Rat {
 }
 
 impl Rat {
+    pub fn new() -> Self {
+        Self {
+            //state: None,
+        }
+    }
+
     fn render_main(&self, area: Rect, buf: &mut Buffer) {
         // Layout: pixel rat on left, text info on right
         let layout = Layout::default()
@@ -53,15 +61,13 @@ impl Rat {
 
         // Split by newlines and create a Line for each part
         for line_text in status.split('\n') {
-            lines.push(mousefood::ratatui::text::Line::from(line_text));
+            lines.push(Line::from(line_text));
         }
 
         // Mode and cups
         let mode_str = "COFFEE";
-        lines.push(mousefood::ratatui::text::Line::from(""));
-        lines.push(mousefood::ratatui::text::Line::from(format!(
-            "Mode: {mode_str}"
-        )));
+        lines.push(Line::from(""));
+        lines.push(Line::from(format!("Mode: {mode_str}")));
 
         Paragraph::new(lines)
             .block(Block::default().padding(Padding::new(1, 0, 1, 0)))
