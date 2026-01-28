@@ -3,14 +3,19 @@ use maratui::qoi_widget::QoiImage;
 use maratui::screens::{Rat, Screen, screen::Board};
 use maratui::setup::MaraUiApp;
 use maratui::telemetry::TelemetryFrame;
-use mousefood::prelude::*;
-use mousefood::ratatui::layout::{Direction, Layout};
-use mousefood::ratatui::widgets::{
+use ratatui::Frame;
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Style, Stylize};
+use ratatui::symbols;
+use ratatui::text::Line;
+use ratatui::widgets::{
     Axis, Block, Chart, Dataset, GraphType, LegendPosition, Paragraph, Tabs, Wrap,
 };
+use ratatui::widgets::{Padding, Widget};
 use strum::IntoEnumIterator;
 use tinyqoi::Qoi;
-use tui_big_text::{BigText, PixelSize};
+use tui_widgets::big_text::{BigText, PixelSize};
 
 /// Application state.
 ///
@@ -37,7 +42,6 @@ pub struct MaraUi {
 /// The main application trait that you need to implement.
 impl MaraUiApp for MaraUi {
     /// Draw the UI frame.
-    ///
     /// This is being called in the main loop to render the UI.
     fn draw(&self, frame: &mut Frame) {
         let titles = Screen::iter().map(|s| s.to_string());
@@ -129,21 +133,16 @@ impl MaraUi {
 
         // Split by newlines and create a Line for each part
         for line_text in status.split('\n') {
-            lines.push(mousefood::ratatui::text::Line::from(line_text));
+            lines.push(Line::from(line_text));
         }
 
         // Mode and cups
         let mode_str = "COFFEE";
-        lines.push(mousefood::ratatui::text::Line::from(""));
-        lines.push(mousefood::ratatui::text::Line::from(format!(
-            "Mode: {mode_str}"
-        )));
+        lines.push(Line::from(""));
+        lines.push(Line::from(format!("Mode: {mode_str}")));
 
         Paragraph::new(lines)
-            .block(
-                Block::default()
-                    .padding(mousefood::ratatui::widgets::block::Padding::new(1, 0, 1, 0)),
-            )
+            .block(Block::default().padding(Padding::new(1, 0, 1, 0)))
             .render(area, buf);
     }
 
@@ -178,7 +177,6 @@ impl MaraUi {
         let big_text = BigText::builder()
             .pixel_size(PixelSize::HalfWidth)
             .centered()
-            .style(Style::default().yellow())
             .lines(vec!["138".into()])
             .build();
 
@@ -206,7 +204,7 @@ impl MaraUi {
 
         for i in 0..360 {
             let x = i as f64;
-            let y = (i / 2) as f64; // псевдо-температура
+            let y = (i / 2) as f64;
             data.push((x, y));
         }
 
@@ -218,7 +216,7 @@ impl MaraUi {
 
         for i in 0..360 {
             let x = i as f64;
-            let y = 128 as f64; // псевдо-температура
+            let y = 128 as f64;
             data.push((x, y));
         }
 

@@ -1,9 +1,9 @@
 use mousefood::embedded_graphics::pixelcolor::{Rgb888, RgbColor};
 use mousefood::embedded_graphics::prelude::OriginDimensions;
-use mousefood::prelude::*;
-use mousefood::ratatui::buffer::Buffer;
-use mousefood::ratatui::layout::Rect;
-use mousefood::ratatui::widgets::Widget;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::Color;
+use ratatui::widgets::Widget;
 use tinyqoi::Qoi;
 
 /// A widget that renders a QOI image using character blocks.

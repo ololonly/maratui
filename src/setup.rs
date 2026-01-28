@@ -1,26 +1,18 @@
 use crate::button::{Button, ButtonState};
 use crate::telemetry::TelemetryFrame;
-use crate::uart_reader::{self, UartReader};
+use crate::uart_reader::UartReader;
+use display_interface_spi::SPIInterface;
 use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::{AnyIOPin, InterruptType, PinDriver};
 use esp_idf_svc::hal::prelude::*;
-use esp_idf_svc::hal::spi::config::MODE_3;
 use esp_idf_svc::hal::spi::{SpiConfig, SpiDeviceDriver, SpiDriverConfig};
+use ili9341::{DisplaySize240x320, Ili9341, Orientation};
 use log::{info, warn};
-use mipidsi::Builder;
-use mipidsi::interface::SpiInterface;
-use mipidsi::models::ST7789;
-use mipidsi::options::{ColorInversion, Orientation, Rotation};
-use mousefood::embedded_graphics::draw_target::DrawTarget;
-use mousefood::embedded_graphics::prelude::*;
-use mousefood::fonts;
+use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor, Size};
+use mousefood::embedded_graphics::primitives::Rectangle;
+use mousefood::fonts::*;
 use mousefood::prelude::*;
-
-/// Offset to align the display correctly.
-const DISPLAY_OFFSET: (u16, u16) = (52, 40);
-
-/// Display size in pixels.
-const DISPLAY_SIZE: (u16, u16) = (135, 240);
+use ratatui::{Frame, Terminal};
 
 /// Application trait to be implemented by the user.
 pub trait MaraUiApp {
@@ -52,46 +44,43 @@ fn run_app(mut app: impl MaraUiApp) {
 
     let peripherals = Peripherals::take().unwrap();
 
-    // Turn on display backlight
-    let mut backlight = PinDriver::output(peripherals.pins.gpio4).unwrap();
-    backlight.set_high().unwrap();
+    let spi_p = peripherals.spi2; // SPI2 is used for the display
 
-    // Configure SPI
-    let config = SpiConfig::new()
-        .write_only(true)
-        .baudrate(80u32.MHz().into())
-        .data_mode(MODE_3);
-    let spi_device = SpiDeviceDriver::new_single(
-        peripherals.spi2,
-        peripherals.pins.gpio18,
-        peripherals.pins.gpio19,
-        Option::<AnyIOPin>::None,
-        Some(peripherals.pins.gpio5),
-        &SpiDriverConfig::new(),
-        &config,
+    let dc = peripherals.pins.gpio27; // DC pin for display
+    let mosi = peripherals.pins.gpio13; // MOSI pin for display
+    let sclk = peripherals.pins.gpio15; // SCK pin for display
+    let cs = Some(peripherals.pins.gpio25); // CS pin for display
+    let rst = peripherals.pins.gpio33; // Reset pin for display
+    let sdi = Option::<AnyIOPin>::None; // MISO not used for display
+
+    let rst = PinDriver::output(rst).unwrap();
+    let dc = PinDriver::output(dc).unwrap();
+    let driver_config = Default::default();
+    let spi_config = SpiConfig::new().baudrate(20u32.MHz().into());
+    let spi = SpiDeviceDriver::new_single(spi_p, sclk, mosi, sdi, cs, &driver_config, &spi_config)
+        .unwrap();
+
+    let di = SPIInterface::new(spi, dc);
+
+    let mut display = Ili9341::new(
+        di,
+        rst,
+        &mut esp_idf_svc::hal::delay::FreeRtos,
+        Orientation::Landscape,
+        DisplaySize240x320,
     )
     .unwrap();
-    let buffer = Box::leak(Box::new([0_u8; 4096]));
-    let spi_interface = SpiInterface::new(
-        spi_device,
-        PinDriver::output(peripherals.pins.gpio16).unwrap(),
-        buffer,
-    );
-
-    // Configure display
-    let mut delay = Ets;
-    let mut display = Builder::new(ST7789, spi_interface)
-        .invert_colors(ColorInversion::Inverted)
-        .reset_pin(PinDriver::output(peripherals.pins.gpio23).unwrap())
-        .display_offset(DISPLAY_OFFSET.0, DISPLAY_OFFSET.1)
-        .display_size(DISPLAY_SIZE.0, DISPLAY_SIZE.1)
-        .orientation(Orientation::new().rotate(Rotation::Deg90))
-        .init(&mut delay)
-        .expect("Failed to init display");
 
     display
-        .clear(Rgb565::BLACK)
-        .expect("Failed to clear display");
+        .fill_solid(
+            &Rectangle::new(Point::new(0, 0), Size::new(320, 240)),
+            Rgb565::BLACK,
+        )
+        .unwrap();
+
+    // Turn on display backlight
+    // let mut backlight = PinDriver::output(peripherals.pins.gpio21).unwrap();
+    // backlight.set_high().unwrap();
 
     // Draw the UI
     // Configure buttons
@@ -103,12 +92,14 @@ fn run_app(mut app: impl MaraUiApp) {
     button2.set_interrupt_type(InterruptType::NegEdge).unwrap();
     let mut button2_state = ButtonState::default();
 
-    // Setup Mousefood and Ratatui
-    // let config = EmbeddedBackendConfig {
-    //     font_regular: fonts::MONO_7X14,
-    //     ..Default::default()
-    // };
-    let backend = EmbeddedBackend::new(&mut display, Default::default());
+    let config = EmbeddedBackendConfig {
+        font_regular: MONO_7X14,
+        font_bold: Some(MONO_7X14_BOLD),
+        font_italic: Some(MONO_7X14),
+        ..Default::default()
+    };
+
+    let backend = EmbeddedBackend::new(&mut display, config);
     let mut terminal = Terminal::new(backend).unwrap();
 
     let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
@@ -116,7 +107,7 @@ fn run_app(mut app: impl MaraUiApp) {
     info!("Initializing UART1: TX=GPIO17, RX=GPIO22, baud=9600");
     let uart_reader = match UartReader::new(
         peripherals.uart1,
-        peripherals.pins.gpio17,
+        peripherals.pins.gpio21,
         peripherals.pins.gpio22,
     ) {
         Ok(reader) => {
@@ -163,7 +154,7 @@ fn run_app(mut app: impl MaraUiApp) {
             });
         }
 
-        // Check for UART data (non-blocking)
+        //Check for UART data (non-blocking)
         while let Ok(telemetry) = rx.try_recv() {
             app.update_telemetry(telemetry);
         }

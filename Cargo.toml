@@ -4,15 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+display-interface-spi = "0.5.0"
 esp-idf-svc = { version = "0.51", features = ["critical-section"] }
+ili9341 = "0.6.0"
+libc = "0.2"
 log = "0.4"
-mipidsi = "0.9.0"
-mousefood = "0.2.1"
-ratatui-core = "0.1.0"
+#using git version of mousefood to get latest features
+mousefood = { git = "https://github.com/ratatui/mousefood", default-features=false, features = ["fonts"] }
+ratatui = {version = "0.30.0", default-features = false}
 strum = "0.27.2"
 strum_macros = "0.27.2"
 tinyqoi = "0.2.0"
-tui-big-text = "=0.7.0"
+tui-widgets = {version = "0.7.0", default-features=false, features=["big-text"]}
 
 [build-dependencies]
 embuild = { version = "0.33", features = ["espidf"] }
