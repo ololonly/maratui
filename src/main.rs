@@ -1,6 +1,6 @@
 use maratui::button::{Button, ButtonPressType};
 use maratui::qoi_widget::QoiImage;
-use maratui::screens::{Rat, Screen, screen::Board};
+use maratui::screens::{Board, Dashboard, Rat, Screen};
 use maratui::setup::MaraUiApp;
 use maratui::telemetry::TelemetryFrame;
 use ratatui::Frame;
@@ -88,115 +88,13 @@ impl MaraUiApp for MaraUi {
 
 impl MaraUi {
     fn render_tab_content(&self, area: Rect, frame: &mut Frame) {
-        let current_board = match self.state.screen {
-            Screen::Main => Rat::new(),
-            // Screen::Dashboard => self.render_dashboard(area, frame),
+        match self.state.screen {
+            Screen::Main => Rat::new().render(area, frame),
+            Screen::Dashboard => Dashboard::default().render(area, frame),
             // Screen::Graphs => self.render_graphs(area, frame),
             // Screen::Debug => self.render_debug(area, frame.buffer_mut()),
-            _ => return,
-        };
-
-        Board::render(&current_board, area, frame);
-    }
-
-    fn render_main(&self, area: Rect, buf: &mut Buffer) {
-        // Layout: pixel rat on left, text info on right
-        let layout = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
-            .split(area);
-
-        // Left area: render QOI image as Ratatui widget
-        let rat_area = layout[0];
-        let data = include_bytes!("../assets/rat_barista.qoi");
-        let qoi = Qoi::new(data).unwrap();
-        let image_widget = QoiImage::new(&qoi);
-
-        image_widget.render(rat_area, buf);
-
-        // Render status text on the right
-        let status_area = layout[1];
-        self.render_main_status(status_area, buf);
-    }
-
-    fn render_main_status(
-        &self,
-        area: Rect,
-        buf: &mut Buffer,
-        // snapshot: Option<&Snapshot>,
-        // cups: Option<u32>,
-    ) {
-        let mut lines = Vec::new();
-
-        // Status text - split by newlines to create multiple lines
-        let status = "System ready\nfor coffee.";
-
-        // Split by newlines and create a Line for each part
-        for line_text in status.split('\n') {
-            lines.push(Line::from(line_text));
+            _ => {}
         }
-
-        // Mode and cups
-        let mode_str = "COFFEE";
-        lines.push(Line::from(""));
-        lines.push(Line::from(format!("Mode: {mode_str}")));
-
-        Paragraph::new(lines)
-            .block(Block::default().padding(Padding::new(1, 0, 1, 0)))
-            .render(area, buf);
-    }
-
-    fn render_dashboard(&self, area: Rect, frame: &mut Frame) {
-        let buf = frame.buffer_mut();
-
-        let t_frame = self.state.telemetry.as_ref().unwrap();
-
-        let [col1, col2, col3] = Layout::horizontal([Constraint::Fill(1); 3]).areas(area);
-
-        let col1_areas = Layout::vertical([Constraint::Fill(1); 3]).split(col1);
-        let col3_areas = Layout::vertical([Constraint::Fill(1); 3]).split(col3);
-
-        if let Some(tt) = t_frame.boiler_target_c {
-            Paragraph::new(Line::from(format!("Target {tt}")))
-                .wrap(Wrap { trim: true })
-                .centered()
-                .block(Block::default())
-                .render(col1_areas[0], buf);
-            Paragraph::new(Line::from(format!("Current {}", t_frame.boiler_now_c)))
-                .wrap(Wrap { trim: true })
-                .centered()
-                .block(Block::default())
-                .render(col1_areas[1], buf);
-            Paragraph::new(Line::from(format!("Current HX {}", t_frame.hx_now_c)))
-                .wrap(Wrap { trim: true })
-                .centered()
-                .block(Block::default())
-                .render(col1_areas[2], buf);
-        }
-
-        let big_text = BigText::builder()
-            .pixel_size(PixelSize::HalfWidth)
-            .centered()
-            .lines(vec!["138".into()])
-            .build();
-
-        Paragraph::new(Line::from(format!("Mode {}", t_frame.mode.to_string())))
-            .wrap(Wrap { trim: true })
-            .centered()
-            .block(Block::default())
-            .render(col3_areas[0], buf);
-        Paragraph::new(Line::from(format!("Heating {}", t_frame.heating_on)))
-            .wrap(Wrap { trim: true })
-            .centered()
-            .block(Block::default())
-            .render(col3_areas[1], buf);
-        Paragraph::new(Line::from(format!("Pump {}", t_frame.pump_on)))
-            .wrap(Wrap { trim: true })
-            .centered()
-            .block(Block::default())
-            .render(col3_areas[2], buf);
-
-        frame.render_widget(big_text, col2);
     }
 
     fn demo_dataset() -> Vec<(f64, f64)> {
