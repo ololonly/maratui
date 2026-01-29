@@ -11,3 +11,5 @@ pub mod telemetry;
 
 pub mod screens;
 pub mod uart_reader;
+
+pub mod brew_timer;

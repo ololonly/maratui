@@ -4,11 +4,13 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph, Widget, Wrap};
 use tui_widgets::big_text::{BigText, PixelSize};
 
+use crate::brew_timer::BrewTimer;
 use crate::{screens::screen::Board, telemetry::TelemetryFrame};
 
 #[derive(Default)]
 pub struct Dashboard {
     pub state: Option<TelemetryFrame>,
+    pub brew_timer: BrewTimer,
 }
 
 impl Board for Dashboard {
@@ -40,10 +42,12 @@ impl Board for Dashboard {
                 .render(col1_areas[2], buf);
         }
 
+        let time = self.brew_timer.elapsed_secs();
+
         let big_text = BigText::builder()
             .pixel_size(PixelSize::HalfWidth)
             .centered()
-            .lines(vec!["138".into()])
+            .lines(vec![Line::from(format!("{}", time))])
             .build();
 
         Paragraph::new(Line::from(format!("Mode {}", t_frame.mode.to_string())))
@@ -67,15 +71,19 @@ impl Board for Dashboard {
 }
 
 impl Dashboard {
-    pub fn new(state: &Option<TelemetryFrame>) -> Self {
+    pub fn new(state: &Option<TelemetryFrame>, brew_timer: BrewTimer) -> Self {
         Self {
             state: state.clone(),
+            brew_timer: brew_timer,
         }
     }
 
     pub fn default() -> Self {
+        let mut bt = BrewTimer::new();
+        bt.start();
         Self {
             state: Some(TelemetryFrame::debug_frame()),
+            brew_timer: bt,
         }
     }
 }

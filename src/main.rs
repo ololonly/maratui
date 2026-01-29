@@ -1,3 +1,4 @@
+use maratui::brew_timer::BrewTimer;
 use maratui::button::{Button, ButtonPressType};
 use maratui::screens::{Board, Dashboard, Debug, Graphs, Rat, Screen};
 use maratui::setup::MaraUiApp;
@@ -13,6 +14,7 @@ use strum::IntoEnumIterator;
 #[derive(Default, Clone)]
 pub struct UiState {
     screen: Screen,
+    brew_timer: BrewTimer,
     telemetry: Option<TelemetryFrame>,
 }
 
@@ -64,6 +66,16 @@ impl MaraUiApp for MaraUi {
     }
 
     fn update_telemetry(&mut self, telemetry: TelemetryFrame) {
+        if let Some(prev) = &self.state.telemetry {
+            if !prev.pump_on && telemetry.pump_on {
+                self.state.brew_timer.start();
+            }
+
+            if prev.pump_on && !telemetry.pump_on {
+                self.state.brew_timer.stop();
+            }
+        }
+
         self.state.telemetry = Some(telemetry);
     }
 }
@@ -72,7 +84,9 @@ impl MaraUi {
     fn render_tab_content(&self, area: Rect, frame: &mut Frame) {
         match self.state.screen {
             Screen::Main => Rat::new().render(area, frame),
-            Screen::Dashboard => Dashboard::new(&self.state.telemetry).render(area, frame),
+            Screen::Dashboard => {
+                Dashboard::new(&self.state.telemetry, self.state.brew_timer).render(area, frame)
+            }
             Screen::Graphs => Graphs::default().render(area, frame),
             Screen::Debug => Debug::new(&self.state.telemetry).render(area, frame),
         }
