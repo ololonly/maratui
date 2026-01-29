@@ -8,4 +8,6 @@ pub mod button;
 pub mod qoi_widget;
 
 pub mod telemetry;
+
+pub mod screens;
 pub mod uart_reader;

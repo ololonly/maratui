@@ -5,7 +5,7 @@ use display_interface_spi::SPIInterface;
 use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::{AnyIOPin, InterruptType, PinDriver};
 use esp_idf_svc::hal::prelude::*;
-use esp_idf_svc::hal::spi::{SpiConfig, SpiDeviceDriver, SpiDriverConfig};
+use esp_idf_svc::hal::spi::{SpiConfig, SpiDeviceDriver};
 use ili9341::{DisplaySize240x320, Ili9341, Orientation};
 use log::{info, warn};
 use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor, Size};
@@ -132,11 +132,8 @@ fn run_app(mut app: impl MaraUiApp) {
     // Give UART task time to start
     Ets::delay_ms(100);
 
-    let mut frame_counter = 0u32;
     // Enter main event loop
     loop {
-        frame_counter += 1;
-
         // Handle button states
         let button1_pressed = button1.is_low();
         let button2_pressed = button2.is_low();

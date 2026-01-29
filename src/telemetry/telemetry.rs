@@ -44,6 +44,23 @@ pub struct TelemetryFrame {
     pub pump_on: bool,                // "1"/"0"
 }
 
+impl TelemetryFrame {
+    pub fn debug_frame() -> Self {
+        Self {
+            raw_string: "C1.10,120,138,090,0000,1,0".to_string(),
+            mode: MachineMode::Coffee,
+            sw_version: "1.10".to_string(),
+            boiler_now_c: 120,
+            boiler_target_c: Some(138),
+            hx_now_c: 90,
+            boost_countdown_s: 0,
+            heating_on: true,
+            pump_on: false,
+            no_water_code: Some(0),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
     Empty,

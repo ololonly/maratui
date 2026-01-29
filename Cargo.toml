@@ -10,7 +10,7 @@ ili9341 = "0.6.0"
 libc = "0.2"
 log = "0.4"
 #using git version of mousefood to get latest features
-mousefood = { git = "https://github.com/ratatui/mousefood", default-features=false, features = ["fonts"] }
+mousefood = { version = "0.3.0", default-features=false, features = ["fonts"] }
 ratatui = {version = "0.30.0", default-features = false}
 strum = "0.27.2"
 strum_macros = "0.27.2"

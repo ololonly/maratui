@@ -1200,8 +1200,9 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "mousefood"
-version = "0.2.1"
-source = "git+https://github.com/ratatui/mousefood#1ecb82293d1ec7f5422561a07416db8257ec0380"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c895b8afcfff3579fa42ba9ad1cdedc84eddfdf1da24fcb5b1cbbc2f4eec6d12"
 dependencies = [
  "embedded-graphics",
  "embedded-graphics-unicodefonts",
