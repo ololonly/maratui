@@ -1,10 +1,7 @@
-use crate::qoi_widget::QoiImage;
 use ratatui::Frame;
-use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Padding, Paragraph, Widget, Wrap};
-use tinyqoi::Qoi;
+use ratatui::widgets::{Block, Paragraph, Widget, Wrap};
 use tui_widgets::big_text::{BigText, PixelSize};
 
 use crate::{screens::screen::Board, telemetry::TelemetryFrame};
@@ -70,8 +67,10 @@ impl Board for Dashboard {
 }
 
 impl Dashboard {
-    pub fn new(state: Option<TelemetryFrame>) -> Self {
-        Self { state: state }
+    pub fn new(state: &Option<TelemetryFrame>) -> Self {
+        Self {
+            state: state.clone(),
+        }
     }
 
     pub fn default() -> Self {

@@ -6,7 +6,7 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Padding, Paragraph, Widget};
 use tinyqoi::Qoi;
 
-use crate::{screens::screen::Board, telemetry::TelemetryFrame};
+use crate::screens::screen::Board;
 
 #[derive(Default)]
 pub struct Rat {

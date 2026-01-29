@@ -1,10 +1,9 @@
 use crate::telemetry::{TelemetryFrame, parse_uart_line};
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::AnyIOPin;
-use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::uart::config::{Config, DataBits, Parity, StopBits};
-use esp_idf_svc::hal::uart::{UART1, UART2, UartDriver};
+use esp_idf_svc::hal::uart::{UART1, UartDriver};
 use esp_idf_svc::sys::EspError;
 use log::{info, warn};
 use std::sync::mpsc::Sender;
@@ -67,7 +66,7 @@ impl UartReader {
         info!("About to spawn UART thread - thread::spawn called");
 
         thread::spawn(move || {
-            let mut uart = uart;
+            let uart = uart;
             let mut line_buffer = String::new();
             let mut byte_buffer = [0u8; 1];
 
