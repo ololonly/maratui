@@ -1,6 +1,9 @@
 [build]
 target = "xtensa-esp32-espidf"
 
+[alias]
+sim = "build --no-default-features --features simulator"
+
 [target.xtensa-esp32-espidf]
 linker = "ldproxy"
 

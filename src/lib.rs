@@ -10,6 +10,8 @@ pub mod qoi_widget;
 pub mod telemetry;
 
 pub mod screens;
+
+#[cfg(feature = "device")]
 pub mod uart_reader;
 
 pub mod brew_timer;
