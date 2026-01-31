@@ -31,7 +31,7 @@ type DisplayResult<'a> = anyhow::Result<
     >,
 >;
 #[cfg(feature = "simulator")]
-use embedded_graphics_simulator::SimulatorDisplay;
+use embedded_graphics_simulator::{OutputSettingsBuilder, SimulatorDisplay, SimulatorEvent, Window};
 
 /// Application trait to be implemented by the user.
 pub trait MaraUiApp {
@@ -199,9 +199,19 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 
 #[cfg(feature = "simulator")]
 fn run_app_simulator(app: impl MaraUiApp) {
+    let output_settings = OutputSettingsBuilder::new().scale(2).build();
+    let mut simulator_window = Window::new("Maratui Simulator", &output_settings);
+    simulator_window.set_max_fps(30);
+
     let mut display = SimulatorDisplay::<Rgb565>::new(Size::new(320, 240));
 
     let config = EmbeddedBackendConfig {
+        flush_callback: Box::new(move |display: &mut SimulatorDisplay<Rgb565>| {
+            simulator_window.update(display);
+            if simulator_window.events().any(|e| e == SimulatorEvent::Quit) {
+                panic!("simulator window closed");
+            }
+        }),
         font_regular: MONO_7X14,
         font_bold: Some(MONO_7X14_BOLD),
         font_italic: Some(MONO_7X14),
