@@ -230,7 +230,7 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
     let backend = EmbeddedBackend::new(&mut display, config);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    app.update_telemetry(TelemetryFrame::default());
+    app.update_telemetry(TelemetryFrame::debug_frame());
 
     loop {
         terminal
