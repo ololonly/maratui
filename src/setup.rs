@@ -1,10 +1,15 @@
-use crate::button::{Button, ButtonState};
+use crate::button::{Button, ButtonPressType, ButtonState};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor, Size};
 use mousefood::embedded_graphics::primitives::Rectangle;
 use mousefood::fonts::*;
 use mousefood::prelude::*;
 use ratatui::{Frame, Terminal};
+
+#[cfg(feature = "simulator")]
+use std::cell::RefCell;
+#[cfg(feature = "simulator")]
+use std::rc::Rc;
 
 #[cfg(feature = "device")]
 use crate::uart_reader::UartReader;
@@ -31,7 +36,9 @@ type DisplayResult<'a> = anyhow::Result<
     >,
 >;
 #[cfg(feature = "simulator")]
-use embedded_graphics_simulator::{OutputSettingsBuilder, SimulatorDisplay, SimulatorEvent, Window};
+use embedded_graphics_simulator::{
+    OutputSettingsBuilder, SimulatorDisplay, SimulatorEvent, Window, sdl2::Keycode,
+};
 
 /// Application trait to be implemented by the user.
 pub trait MaraUiApp {
@@ -198,19 +205,21 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 }
 
 #[cfg(feature = "simulator")]
-fn run_app_simulator(app: impl MaraUiApp) {
+fn run_app_simulator(mut app: impl MaraUiApp) {
     let output_settings = OutputSettingsBuilder::new().scale(2).build();
-    let mut simulator_window = Window::new("Maratui Simulator", &output_settings);
-    simulator_window.set_max_fps(30);
+    let simulator_window = Rc::new(RefCell::new(Window::new(
+        "Maratui Simulator",
+        &output_settings,
+    )));
+    simulator_window.borrow_mut().set_max_fps(30);
 
     let mut display = SimulatorDisplay::<Rgb565>::new(Size::new(320, 240));
 
+    let simulator_window_for_flush = Rc::clone(&simulator_window);
     let config = EmbeddedBackendConfig {
         flush_callback: Box::new(move |display: &mut SimulatorDisplay<Rgb565>| {
-            simulator_window.update(display);
-            if simulator_window.events().any(|e| e == SimulatorEvent::Quit) {
-                panic!("simulator window closed");
-            }
+            let mut window = simulator_window_for_flush.borrow_mut();
+            window.update(display);
         }),
         font_regular: MONO_7X14,
         font_bold: Some(MONO_7X14_BOLD),
@@ -221,11 +230,36 @@ fn run_app_simulator(app: impl MaraUiApp) {
     let backend = EmbeddedBackend::new(&mut display, config);
     let mut terminal = Terminal::new(backend).unwrap();
 
+    app.update_telemetry(TelemetryFrame::default());
+
     loop {
         terminal
             .draw(|f| {
                 app.draw(f);
             })
             .unwrap();
+
+        for event in simulator_window.borrow_mut().events() {
+            match event {
+                SimulatorEvent::Quit => panic!("simulator window closed"),
+                SimulatorEvent::KeyDown {
+                    keycode, repeat, ..
+                } => {
+                    if repeat {
+                        continue;
+                    }
+                    match keycode {
+                        Keycode::Left => {
+                            app.handle_press(Button::Button2(ButtonPressType::Short));
+                        }
+                        Keycode::Right => {
+                            app.handle_press(Button::Button1(ButtonPressType::Short));
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 }
