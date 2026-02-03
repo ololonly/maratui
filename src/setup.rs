@@ -1,70 +1,28 @@
-use crate::button::{Button, ButtonPressType, ButtonState};
+use crate::app::MaraUiApp;
+use crate::button::{Button, ButtonState};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor, Size};
 use mousefood::embedded_graphics::primitives::Rectangle;
 use mousefood::fonts::*;
 use mousefood::prelude::*;
-use ratatui::{Frame, Terminal};
+use ratatui::Terminal;
 
-#[cfg(feature = "simulator")]
-use std::cell::RefCell;
-#[cfg(feature = "simulator")]
-use std::rc::Rc;
-
-#[cfg(feature = "device")]
 use crate::uart_reader::UartReader;
-#[cfg(feature = "device")]
 use display_interface_spi::SPIInterface;
-#[cfg(feature = "device")]
 use esp_idf_svc::hal::delay::Ets;
-#[cfg(feature = "device")]
 use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio27, Gpio33, InterruptType, Output, PinDriver};
-#[cfg(feature = "device")]
 use esp_idf_svc::hal::prelude::*;
-#[cfg(feature = "device")]
 use esp_idf_svc::hal::spi::{SPI2, SpiConfig, SpiDeviceDriver, SpiDriver};
-#[cfg(feature = "device")]
 use ili9341::{DisplaySize240x320, Ili9341, Orientation};
-#[cfg(feature = "device")]
 use log::{info, warn};
 
-#[cfg(feature = "device")]
 type DisplayResult<'a> = anyhow::Result<
     Ili9341<
         SPIInterface<SpiDeviceDriver<'a, SpiDriver<'a>>, PinDriver<'a, Gpio27, Output>>,
         PinDriver<'a, Gpio33, Output>,
     >,
 >;
-#[cfg(feature = "simulator")]
-use embedded_graphics_simulator::{
-    OutputSettingsBuilder, SimulatorDisplay, SimulatorEvent, Window, sdl2::Keycode,
-};
 
-/// Application trait to be implemented by the user.
-pub trait MaraUiApp {
-    /// Draw the UI frame.
-    fn draw(&self, frame: &mut Frame);
-
-    /// Handle button press events.
-    fn handle_press(&mut self, button: Button);
-
-    fn next_tab(&mut self);
-    fn previous_tab(&mut self);
-
-    fn update_telemetry(&mut self, telemetry: TelemetryFrame);
-
-    /// Run the application.
-    ///
-    /// Default implementation provided. Do not override unless necessary.
-    fn run(self)
-    where
-        Self: Sized,
-    {
-        run_app(self);
-    }
-}
-
-#[cfg(feature = "device")]
 fn get_ili9341<'a>(
     spi_p: SPI2,
     dc: esp_idf_svc::hal::gpio::Gpio27,
@@ -102,19 +60,12 @@ fn get_ili9341<'a>(
     Ok(display)
 }
 
-#[cfg(feature = "device")]
-fn run_app(app: impl MaraUiApp) {
+pub fn run_app(app: impl MaraUiApp) {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
     run_app_hardware(app);
 }
 
-#[cfg(feature = "simulator")]
-fn run_app(app: impl MaraUiApp) {
-    run_app_simulator(app);
-}
-
-#[cfg(feature = "device")]
 fn run_app_hardware(mut app: impl MaraUiApp) {
     let peripherals = Peripherals::take().unwrap();
     let spi_p = peripherals.spi2;
@@ -201,65 +152,5 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
                 app.draw(f);
             })
             .unwrap();
-    }
-}
-
-#[cfg(feature = "simulator")]
-fn run_app_simulator(mut app: impl MaraUiApp) {
-    let output_settings = OutputSettingsBuilder::new().scale(2).build();
-    let simulator_window = Rc::new(RefCell::new(Window::new(
-        "Maratui Simulator",
-        &output_settings,
-    )));
-    simulator_window.borrow_mut().set_max_fps(30);
-
-    let mut display = SimulatorDisplay::<Rgb565>::new(Size::new(320, 240));
-
-    let simulator_window_for_flush = Rc::clone(&simulator_window);
-    let config = EmbeddedBackendConfig {
-        flush_callback: Box::new(move |display: &mut SimulatorDisplay<Rgb565>| {
-            let mut window = simulator_window_for_flush.borrow_mut();
-            window.update(display);
-        }),
-        font_regular: MONO_7X14,
-        font_bold: Some(MONO_7X14_BOLD),
-        font_italic: Some(MONO_7X14),
-        ..Default::default()
-    };
-
-    let backend = EmbeddedBackend::new(&mut display, config);
-    let mut terminal = Terminal::new(backend).unwrap();
-
-    app.update_telemetry(TelemetryFrame::debug_frame());
-
-    loop {
-        terminal
-            .draw(|f| {
-                app.draw(f);
-            })
-            .unwrap();
-
-        for event in simulator_window.borrow_mut().events() {
-            match event {
-                SimulatorEvent::Quit => panic!("simulator window closed"),
-                SimulatorEvent::KeyDown {
-                    keycode, repeat, ..
-                } => {
-                    if repeat {
-                        continue;
-                    }
-                    match keycode {
-                        Keycode::Left => {
-                            app.handle_press(Button::Button2(ButtonPressType::Short));
-                        }
-                        Keycode::Right => {
-                            app.handle_press(Button::Button1(ButtonPressType::Short));
-                        }
-                        _ => {}
-                    }
-                }
-                _ => {}
-            }
-        }
     }
 }
