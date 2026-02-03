@@ -1,5 +1,5 @@
 // src/telemetry.rs
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use strum::Display;
 
 #[derive(Debug, Display, Default, Clone, Copy, PartialEq, Eq)]
@@ -56,6 +56,21 @@ impl TelemetryFrame {
             boost_countdown_s: 0,
             heating_on: true,
             pump_on: false,
+            no_water_code: Some(0),
+        }
+    }
+
+    pub fn debug_pump_on_frame() -> Self {
+        Self {
+            raw_string: "C1.10,120,138,090,0000,1,1".to_string(),
+            mode: MachineMode::SteamC,
+            sw_version: "1.10".to_string(),
+            boiler_now_c: 120,
+            boiler_target_c: Some(138),
+            hx_now_c: 90,
+            boost_countdown_s: 0,
+            heating_on: true,
+            pump_on: true,
             no_water_code: Some(0),
         }
     }
@@ -164,7 +179,7 @@ pub enum AppEvent {
     ShotStarted,
 
     /// Pump transitioned from ON -> OFF, with total ON duration.
-    ShotEnded { duration: Duration },
+    ShotEnded,
 
     /// No-water condition appeared (None -> Some(code)) or code changed.
     WaterRefillNeeded { code: u16 },
@@ -181,12 +196,6 @@ pub enum AppEvent {
 pub struct MachineState {
     pub last_frame: Option<TelemetryFrame>,
     pub last_update: Option<Instant>,
-
-    /// How long pump has been continuously ON (current shot).
-    pub pump_on_duration: Duration,
-
-    /// Duration of the last finished shot (useful for UI).
-    pub last_shot_duration: Duration,
 }
 
 impl Default for MachineState {
@@ -194,8 +203,6 @@ impl Default for MachineState {
         Self {
             last_frame: None,
             last_update: None,
-            pump_on_duration: Duration::ZERO,
-            last_shot_duration: Duration::ZERO,
         }
     }
 }
@@ -203,7 +210,6 @@ impl Default for MachineState {
 #[derive(Debug, Clone)]
 pub struct Snapshot {
     pub frame: TelemetryFrame,
-    pub pump_on_seconds: u32,
     pub is_extracting: bool,
 }
 
@@ -216,11 +222,6 @@ pub fn update_state_with_events(
     now: Instant,
 ) -> (Snapshot, Vec<AppEvent>) {
     let mut events: Vec<AppEvent> = Vec::new();
-
-    let dt = match state.last_update {
-        Some(prev) if now > prev => now.duration_since(prev),
-        _ => Duration::ZERO,
-    };
 
     // Read previous values (if any) for transition detection
     let (prev_mode, prev_pump_on, prev_no_water) = match state.last_frame.as_ref() {
@@ -242,26 +243,17 @@ pub fn update_state_with_events(
     match (prev_pump_on, frame.pump_on) {
         (false, true) => {
             // Shot started
-            state.pump_on_duration = Duration::ZERO; // reset on rising edge
             events.push(AppEvent::ShotStarted);
-            // Accumulate dt after edge; dt can be 0 on the first frame, that's fine.
-            state.pump_on_duration = state.pump_on_duration.saturating_add(dt);
         }
         (true, true) => {
             // Shot continues
-            state.pump_on_duration = state.pump_on_duration.saturating_add(dt);
         }
         (true, false) => {
             // Shot ended
-            // We include dt up to this frame for a smoother timer.
-            let duration = state.pump_on_duration.saturating_add(dt);
-            state.last_shot_duration = duration;
-            state.pump_on_duration = Duration::ZERO;
-            events.push(AppEvent::ShotEnded { duration });
+            events.push(AppEvent::ShotEnded);
         }
         (false, false) => {
             // No shot
-            state.pump_on_duration = Duration::ZERO;
         }
     }
 
@@ -279,12 +271,10 @@ pub fn update_state_with_events(
     state.last_update = Some(now);
     state.last_frame = Some(frame.clone());
 
-    let pump_on_seconds = state.pump_on_duration.as_secs().min(u64::from(u32::MAX)) as u32;
     let is_extracting = frame.pump_on;
 
     let snapshot = Snapshot {
         frame,
-        pump_on_seconds,
         is_extracting,
     };
 
@@ -293,6 +283,8 @@ pub fn update_state_with_events(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
 
     #[test]
@@ -338,10 +330,6 @@ mod tests {
         let off2 = parse_uart_line("C1.10,039,138,035,0000,1,0").unwrap();
         let (_s3, e3) = update_state_with_events(&mut st, off2, t0 + Duration::from_secs(3));
         assert_eq!(e3.len(), 1);
-        match &e3[0] {
-            AppEvent::ShotEnded { duration } => assert!(*duration >= Duration::from_secs(2)),
-            _ => panic!("expected ShotEnded"),
-        }
     }
 
     #[test]

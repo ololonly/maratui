@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
@@ -5,20 +7,23 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType, Padding, Paragraph, Widget};
 use tui_widgets::big_text::{BigText, PixelSize};
 
-use crate::brew_timer::BrewTimer;
-use crate::{screens::screen::Board, telemetry::TelemetryFrame};
+use crate::screens::screen::Board;
+use crate::state::GlobalAppState;
+use crate::telemetry::TelemetryFrame;
 
+/// Dashboard screen showing machine status and extraction timer
 #[derive(Default)]
-pub struct Dashboard {
-    pub state: Option<TelemetryFrame>,
-    pub brew_timer: BrewTimer,
-}
+pub struct Dashboard;
 
 impl Board for Dashboard {
-    fn render(&self, area: Rect, frame: &mut Frame) {
+    fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         let buf = frame.buffer_mut();
 
-        let t_frame = self.state.as_ref().unwrap();
+        // Get telemetry frame or use debug frame if not available
+        let t_frame = match &state.last_telemetry {
+            Some(frame) => frame.clone(),
+            None => TelemetryFrame::debug_frame(),
+        };
 
         let [col1, col2] = Layout::horizontal(Constraint::from_fills([1, 2])).areas(area);
 
@@ -65,11 +70,24 @@ impl Board for Dashboard {
                 .render(col1_areas[2], buf);
         }
 
-        let time = self.brew_timer.elapsed_secs();
+        // Display extraction timer
+        let extraction_time = if state.extraction_state.is_extracting() {
+            state
+                .extraction_state
+                .elapsed()
+                .unwrap_or(Duration::ZERO)
+                .as_secs()
+        } else {
+            state
+                .extraction_state
+                .last_extraction_duration()
+                .unwrap_or(Duration::ZERO)
+                .as_secs()
+        };
         let big_text = BigText::builder()
             .pixel_size(PixelSize::Full)
             .centered()
-            .lines(vec![Line::from(format!("{}", time))])
+            .lines(vec![Line::from(format!("{}", extraction_time))])
             .style(Style::new().green())
             .build();
 
@@ -106,22 +124,5 @@ impl Board for Dashboard {
             .render(col2_row2_areas[1], buf);
 
         frame.render_widget(big_text, col2);
-    }
-}
-
-impl Dashboard {
-    pub fn new(state: &Option<TelemetryFrame>, brew_timer: BrewTimer) -> Self {
-        Self {
-            state: state.clone(),
-            brew_timer: brew_timer,
-        }
-    }
-
-    pub fn default() -> Self {
-        let bt = BrewTimer::new();
-        Self {
-            state: Some(TelemetryFrame::debug_frame()),
-            brew_timer: bt,
-        }
     }
 }

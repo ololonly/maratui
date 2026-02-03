@@ -4,15 +4,15 @@ use ratatui::text::Line;
 use ratatui::widgets::{Axis, Block, Chart, Dataset, GraphType, LegendPosition};
 use ratatui::{Frame, symbols};
 
-use crate::{screens::screen::Board, telemetry::TelemetryFrame};
+use crate::screens::screen::Board;
+use crate::state::GlobalAppState;
 
+/// Graphs screen showing temperature trends
 #[derive(Default)]
-pub struct Graphs {
-    pub state: Option<TelemetryFrame>,
-}
+pub struct Graphs;
 
 impl Board for Graphs {
-    fn render(&self, area: Rect, frame: &mut Frame) {
+    fn render(_state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         let points = Self::demo_dataset();
         let points2 = Self::demo_dataset2();
 
@@ -53,16 +53,7 @@ impl Board for Graphs {
 }
 
 impl Graphs {
-    pub fn new(state: Option<TelemetryFrame>) -> Self {
-        Self { state: state }
-    }
-
-    pub fn default() -> Self {
-        Self {
-            state: Some(TelemetryFrame::debug_frame()),
-        }
-    }
-
+    /// Generate demo dataset for current temperature
     fn demo_dataset() -> Vec<(f64, f64)> {
         let mut data = Vec::new();
 
@@ -75,6 +66,7 @@ impl Graphs {
         data
     }
 
+    /// Generate demo dataset for target temperature
     fn demo_dataset2() -> Vec<(f64, f64)> {
         let mut data = Vec::new();
 

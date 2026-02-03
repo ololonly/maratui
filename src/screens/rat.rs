@@ -1,4 +1,6 @@
 use crate::qoi_widget::QoiImage;
+use crate::screens::screen::Board;
+use crate::state::GlobalAppState;
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -6,29 +8,20 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Padding, Paragraph, Widget};
 use tinyqoi::Qoi;
 
-use crate::screens::screen::Board;
-
+/// Main screen with rat barista mascot and system status
 #[derive(Default)]
-pub struct Rat {
-    //pub state: Option<TelemetryFrame>,
-}
+pub struct Rat;
 
 impl Board for Rat {
-    fn render(&self, area: Rect, frame: &mut Frame) {
+    fn render(_state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         let buf = frame.buffer_mut();
-        self.render_main(area, buf);
+        Self::render_main(area, buf);
     }
 }
 
 impl Rat {
-    pub fn new() -> Self {
-        Self {
-            //state: None,
-        }
-    }
-
-    fn render_main(&self, area: Rect, buf: &mut Buffer) {
-        // Layout: pixel rat on left, text info on right
+    /// Render the main layout with rat image and status text
+    fn render_main(area: Rect, buf: &mut Buffer) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
@@ -44,16 +37,11 @@ impl Rat {
 
         // Render status text on the right
         let status_area = layout[1];
-        self.render_main_status(status_area, buf);
+        Self::render_main_status(status_area, buf);
     }
 
-    fn render_main_status(
-        &self,
-        area: Rect,
-        buf: &mut Buffer,
-        // snapshot: Option<&Snapshot>,
-        // cups: Option<u32>,
-    ) {
+    /// Render status information text
+    fn render_main_status(area: Rect, buf: &mut Buffer) {
         let mut lines = Vec::new();
 
         // Status text - split by newlines to create multiple lines

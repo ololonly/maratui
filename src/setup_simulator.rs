@@ -1,5 +1,6 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
+use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::Size;
 use mousefood::fonts::*;
 use mousefood::prelude::*;
@@ -63,6 +64,12 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                         }
                         Keycode::Right => {
                             app.handle_press(Button::Button1(ButtonPressType::Short));
+                        }
+                        Keycode::Up => {
+                            app.update_telemetry(TelemetryFrame::debug_pump_on_frame());
+                        }
+                        Keycode::Down => {
+                            app.update_telemetry(TelemetryFrame::debug_frame());
                         }
                         _ => {}
                     }

@@ -1,2 +1,5 @@
 pub mod telemetry;
-pub use telemetry::{MachineMode, TelemetryFrame, parse_uart_line};
+pub use telemetry::{
+    AppEvent, MachineMode, MachineState, Snapshot, TelemetryFrame, parse_uart_line,
+    update_state_with_events,
+};

@@ -19,7 +19,8 @@ pub mod telemetry;
 
 pub mod screens;
 
+/// State management (FSM).
+pub mod state;
+
 #[cfg(not(feature = "simulator"))]
 pub mod uart_reader;
-
-pub mod brew_timer;

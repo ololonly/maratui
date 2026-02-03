@@ -1,7 +1,7 @@
-use crate::brew_timer::BrewTimer;
-use crate::button::{Button, ButtonPressType};
+use crate::button::Button;
 use crate::run_app;
 use crate::screens::{Board, Dashboard, Debug, Graphs, Rat, Screen};
+use crate::state::{AppStateMachine, GlobalAppState};
 use crate::telemetry::TelemetryFrame;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -9,22 +9,21 @@ use ratatui::style::Style;
 use ratatui::symbols;
 use ratatui::widgets::Tabs;
 use ratatui::widgets::Widget;
+use std::time::Instant;
 use strum::IntoEnumIterator;
 
-/// Application trait to be implemented by the user.
+/// Application trait to be implemented by the user
 pub trait MaraUiApp {
-    /// Draw the UI frame.
+    /// Draw the UI frame
     fn draw(&self, frame: &mut Frame);
 
-    /// Handle button press events.
+    /// Handle button press events
     fn handle_press(&mut self, button: Button);
 
-    fn next_tab(&mut self);
-    fn previous_tab(&mut self);
-
+    /// Update application state with telemetry data
     fn update_telemetry(&mut self, telemetry: TelemetryFrame);
 
-    /// Run the application.
+    /// Run the application
     ///
     /// Default implementation provided. Do not override unless necessary.
     fn run(self)
@@ -35,25 +34,20 @@ pub trait MaraUiApp {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct AppState {
-    screen: Screen,
-    brew_timer: BrewTimer,
-    telemetry: Option<TelemetryFrame>,
-}
-
-#[derive(Default, Clone)]
+/// Main application structure
+#[derive(Default)]
 pub struct MaraUi {
-    pub state: AppState,
+    /// Global application state
+    pub state: GlobalAppState,
 }
 
-/// The main application trait that you need to implement.
+/// The main application implementation
 impl MaraUiApp for MaraUi {
-    /// Draw the UI frame.
-    /// This is being called in the main loop to render the UI.
+    /// Draw the UI frame
+    /// This is being called in the main loop to render the UI
     fn draw(&self, frame: &mut Frame) {
         let titles = Screen::iter().map(|s| s.to_string());
-        let selected_tab_index = self.state.screen as usize;
+        let selected_tab_index = self.state.current_screen as usize;
 
         let layout = Layout::default()
             .direction(Direction::Vertical)
@@ -72,50 +66,26 @@ impl MaraUiApp for MaraUi {
         self.render_tab_content(layout[1], frame);
     }
 
-    /// Handle button press events.
+    /// Handle button press events
     fn handle_press(&mut self, button: Button) {
-        match button {
-            Button::Button1(ButtonPressType::Short) => self.next_tab(),
-            Button::Button2(ButtonPressType::Short) => self.previous_tab(),
-            _ => {}
-        }
+        AppStateMachine::handle_button_press(&mut self.state, button);
     }
 
-    fn next_tab(&mut self) {
-        self.state.screen = self.state.screen.next();
-    }
-
-    fn previous_tab(&mut self) {
-        self.state.screen = self.state.screen.previous();
-    }
-
+    /// Update application state with telemetry data
     fn update_telemetry(&mut self, telemetry: TelemetryFrame) {
-        if let Some(prev) = &self.state.telemetry {
-            if !prev.pump_on && telemetry.pump_on {
-                self.state.brew_timer.start();
-            }
-
-            if prev.pump_on && !telemetry.pump_on {
-                self.state.brew_timer.stop();
-            }
-        }
-
-        self.state.telemetry = Some(telemetry);
+        let now = Instant::now();
+        AppStateMachine::handle_telemetry_frame(&mut self.state, telemetry, now);
     }
 }
 
 impl MaraUi {
+    /// Render the content of the current screen
     fn render_tab_content(&self, area: Rect, frame: &mut Frame) {
-        match self.state.screen {
-            Screen::Main => Rat::new().render(area, frame),
-            Screen::Dashboard => {
-                #[cfg(not(feature = "simulator"))]
-                Dashboard::new(&self.state.telemetry, self.state.brew_timer).render(area, frame);
-                #[cfg(feature = "simulator")]
-                Dashboard::default().render(area, frame);
-            }
-            Screen::Graphs => Graphs::default().render(area, frame),
-            Screen::Debug => Debug::new(&self.state.telemetry).render(area, frame),
+        match self.state.current_screen {
+            Screen::Main => Rat::render(&self.state, area, frame),
+            Screen::Dashboard => Dashboard::render(&self.state, area, frame),
+            Screen::Graphs => Graphs::render(&self.state, area, frame),
+            Screen::Debug => Debug::render(&self.state, area, frame),
         }
     }
 }
