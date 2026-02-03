@@ -69,7 +69,6 @@ impl Board for Dashboard {
         }
 
         let time = self.brew_timer.elapsed_secs();
-
         let big_text = BigText::builder()
             .pixel_size(PixelSize::Full)
             .centered()
@@ -83,17 +82,18 @@ impl Board for Dashboard {
             .border_style(Style::new().yellow())
             .padding(Padding::new(1, 0, 1, 0));
 
+        Paragraph::new(Line::from(format!("Heating {}", t_frame.heating_on)))
+            .wrap(Wrap { trim: true })
+            .centered()
+            .block(heat_block)
+            .render(col2_row2_areas[0], buf);
+
         let pump_block = Block::bordered()
             .title("Pump")
             .border_type(BorderType::Rounded)
             .border_style(Style::new().yellow())
             .padding(Padding::new(1, 0, 1, 0));
 
-        Paragraph::new(Line::from(format!("Heating {}", t_frame.heating_on)))
-            .wrap(Wrap { trim: true })
-            .centered()
-            .block(heat_block)
-            .render(col2_row2_areas[0], buf);
         Paragraph::new(Line::from(format!("Pump {}", t_frame.pump_on)))
             .wrap(Wrap { trim: true })
             .centered()
