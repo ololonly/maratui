@@ -1,56 +1,36 @@
+use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonState};
 use crate::telemetry::TelemetryFrame;
-use crate::uart_reader::UartReader;
-use display_interface_spi::SPIInterface;
-use esp_idf_svc::hal::delay::Ets;
-use esp_idf_svc::hal::gpio::{AnyIOPin, InterruptType, PinDriver};
-use esp_idf_svc::hal::prelude::*;
-use esp_idf_svc::hal::spi::{SpiConfig, SpiDeviceDriver};
-use ili9341::{DisplaySize240x320, Ili9341, Orientation};
-use log::{info, warn};
 use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor, Size};
 use mousefood::embedded_graphics::primitives::Rectangle;
 use mousefood::fonts::*;
 use mousefood::prelude::*;
-use ratatui::{Frame, Terminal};
+use ratatui::Terminal;
 
-/// Application trait to be implemented by the user.
-pub trait MaraUiApp {
-    /// Draw the UI frame.
-    fn draw(&self, frame: &mut Frame);
+use crate::uart_reader::UartReader;
+use display_interface_spi::SPIInterface;
+use esp_idf_svc::hal::delay::Ets;
+use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio27, Gpio33, InterruptType, Output, PinDriver};
+use esp_idf_svc::hal::prelude::*;
+use esp_idf_svc::hal::spi::{SPI2, SpiConfig, SpiDeviceDriver, SpiDriver};
+use ili9341::{DisplaySize240x320, Ili9341, Orientation};
+use log::{info, warn};
 
-    /// Handle button press events.
-    fn handle_press(&mut self, button: Button);
+type DisplayResult<'a> = anyhow::Result<
+    Ili9341<
+        SPIInterface<SpiDeviceDriver<'a, SpiDriver<'a>>, PinDriver<'a, Gpio27, Output>>,
+        PinDriver<'a, Gpio33, Output>,
+    >,
+>;
 
-    fn next_tab(&mut self);
-    fn previous_tab(&mut self);
-
-    fn update_telemetry(&mut self, telemetry: TelemetryFrame);
-
-    /// Run the application.
-    ///
-    /// Default implementation provided. Do not override unless necessary.
-    fn run(self)
-    where
-        Self: Sized,
-    {
-        run_app(self);
-    }
-}
-
-fn run_app(mut app: impl MaraUiApp) {
-    esp_idf_svc::sys::link_patches();
-    esp_idf_svc::log::EspLogger::initialize_default();
-
-    let peripherals = Peripherals::take().unwrap();
-
-    let spi_p = peripherals.spi2; // SPI2 is used for the display
-
-    let dc = peripherals.pins.gpio27; // DC pin for display
-    let mosi = peripherals.pins.gpio13; // MOSI pin for display
-    let sclk = peripherals.pins.gpio15; // SCK pin for display
-    let cs = Some(peripherals.pins.gpio25); // CS pin for display
-    let rst = peripherals.pins.gpio33; // Reset pin for display
+fn get_ili9341<'a>(
+    spi_p: SPI2,
+    dc: esp_idf_svc::hal::gpio::Gpio27,
+    mosi: esp_idf_svc::hal::gpio::Gpio13,
+    sclk: esp_idf_svc::hal::gpio::Gpio15,
+    cs: Option<esp_idf_svc::hal::gpio::Gpio25>,
+    rst: esp_idf_svc::hal::gpio::Gpio33,
+) -> DisplayResult<'a> {
     let sdi = Option::<AnyIOPin>::None; // MISO not used for display
 
     let rst = PinDriver::output(rst).unwrap();
@@ -77,18 +57,37 @@ fn run_app(mut app: impl MaraUiApp) {
             Rgb565::BLACK,
         )
         .unwrap();
+    Ok(display)
+}
 
-    // Turn on display backlight
-    // let mut backlight = PinDriver::output(peripherals.pins.gpio21).unwrap();
-    // backlight.set_high().unwrap();
+pub fn run_app(app: impl MaraUiApp) {
+    esp_idf_svc::sys::link_patches();
+    esp_idf_svc::log::EspLogger::initialize_default();
+    run_app_hardware(app);
+}
 
-    // Draw the UI
-    // Configure buttons
-    let mut button1 = PinDriver::input(peripherals.pins.gpio35).unwrap();
+fn run_app_hardware(mut app: impl MaraUiApp) {
+    let peripherals = Peripherals::take().unwrap();
+    let spi_p = peripherals.spi2;
+    let dc = peripherals.pins.gpio27;
+    let mosi = peripherals.pins.gpio13;
+    let sclk = peripherals.pins.gpio15;
+    let cs = Some(peripherals.pins.gpio25);
+    let rst = peripherals.pins.gpio33;
+    let uart1 = peripherals.uart1;
+    let gpio21 = peripherals.pins.gpio21;
+    let gpio22 = peripherals.pins.gpio22;
+    let button1_pin = peripherals.pins.gpio35;
+    let button2_pin = peripherals.pins.gpio0;
+
+    let mut display =
+        get_ili9341(spi_p, dc, mosi, sclk, cs, rst).expect("Failed to initialize display");
+
+    let mut button1 = PinDriver::input(button1_pin).unwrap();
     button1.set_interrupt_type(InterruptType::NegEdge).unwrap();
     let mut button1_state = ButtonState::default();
 
-    let mut button2 = PinDriver::input(peripherals.pins.gpio0).unwrap();
+    let mut button2 = PinDriver::input(button2_pin).unwrap();
     button2.set_interrupt_type(InterruptType::NegEdge).unwrap();
     let mut button2_state = ButtonState::default();
 
@@ -105,11 +104,7 @@ fn run_app(mut app: impl MaraUiApp) {
     let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
 
     info!("Initializing UART1: TX=GPIO17, RX=GPIO22, baud=9600");
-    let uart_reader = match UartReader::new(
-        peripherals.uart1,
-        peripherals.pins.gpio21,
-        peripherals.pins.gpio22,
-    ) {
+    let uart_reader = match UartReader::new(uart1, gpio21, gpio22) {
         Ok(reader) => {
             info!("UART1 initialized successfully");
             reader
@@ -129,12 +124,9 @@ fn run_app(mut app: impl MaraUiApp) {
         }
     }
 
-    // Give UART task time to start
     Ets::delay_ms(100);
 
-    // Enter main event loop
     loop {
-        // Handle button states
         let button1_pressed = button1.is_low();
         let button2_pressed = button2.is_low();
 
@@ -151,7 +143,6 @@ fn run_app(mut app: impl MaraUiApp) {
             });
         }
 
-        //Check for UART data (non-blocking)
         while let Ok(telemetry) = rx.try_recv() {
             app.update_telemetry(telemetry);
         }

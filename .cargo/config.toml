@@ -1,6 +1,10 @@
 [build]
 target = "xtensa-esp32-espidf"
 
+[alias]
+# Simulator: build for host. Linux x86_64; on Mac ARM use aarch64-apple-darwin
+sim = "run --no-default-features --features simulator --target x86_64-unknown-linux-gnu"
+
 [target.xtensa-esp32-espidf]
 linker = "ldproxy"
 

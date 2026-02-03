@@ -7,11 +7,15 @@ pub struct BrewTimer {
 }
 
 impl BrewTimer {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             started_at: None,
             secs: 0,
         }
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.started_at != None
     }
 
     pub fn start(&mut self) {

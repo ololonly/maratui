@@ -3,13 +3,21 @@ name = "maratui"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["device"]
+# Build for ESP. cargo build / cargo build --release
+device = ["dep:esp-idf-svc", "dep:ili9341", "dep:display-interface-spi"]
+# Build UI on host. cargo sim --target <host>
+simulator = ["dep:embedded-graphics-simulator"]
+
 [dependencies]
-display-interface-spi = "0.5.0"
-esp-idf-svc = { version = "0.51", features = ["critical-section"] }
-ili9341 = "0.6.0"
+anyhow = "1.0.100"
+display-interface-spi = { version = "0.5.0", optional = true }
+embedded-graphics-simulator = { version = "0.8.0", optional = true }
+esp-idf-svc = { version = "0.51", features = ["critical-section"], optional = true }
+ili9341 = { version = "0.6.0", optional = true }
 libc = "0.2"
-log = "0.4"
-#using git version of mousefood to get latest features
+log = "0.4.29"
 mousefood = { version = "0.3.0", default-features=false, features = ["fonts"] }
 ratatui = {version = "0.30.0", default-features = false}
 strum = "0.27.2"
@@ -26,3 +34,5 @@ opt-level = 3
 [profile.dev]
 debug = true
 opt-level = 3
+
+
