@@ -2,7 +2,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
-use ratatui::widgets::{Block, BorderType, Padding, Paragraph, Widget, Wrap};
+use ratatui::widgets::{Block, BorderType, Padding, Paragraph, Widget};
 use tui_widgets::big_text::{BigText, PixelSize};
 
 use crate::brew_timer::BrewTimer;
@@ -38,7 +38,6 @@ impl Board for Dashboard {
                 Line::raw(""),
                 Line::from(format!("Current {}°", t_frame.boiler_now_c)),
             ])
-            .wrap(Wrap { trim: true })
             .left_aligned()
             .block(boiler_block)
             .render(col1_areas[0], buf);
@@ -47,10 +46,9 @@ impl Board for Dashboard {
                 .title("HX")
                 .border_type(BorderType::Rounded)
                 .border_style(Style::new().yellow())
-                .padding(Padding::new(0, 0, 1, 0));
+                .padding(Padding::top(1));
 
             Paragraph::new(Line::from(format!("{}°", t_frame.hx_now_c)))
-                .wrap(Wrap { trim: true })
                 .centered()
                 .block(hx_block)
                 .render(col1_areas[1], buf);
@@ -59,10 +57,9 @@ impl Board for Dashboard {
                 .title("Mode")
                 .border_type(BorderType::Rounded)
                 .border_style(Style::new().yellow())
-                .padding(Padding::new(1, 0, 1, 0));
+                .padding(Padding::top(1));
 
             Paragraph::new(Line::from(t_frame.mode.to_string().to_uppercase()))
-                .wrap(Wrap { trim: true })
                 .centered()
                 .block(mode_block)
                 .render(col1_areas[2], buf);
@@ -73,18 +70,22 @@ impl Board for Dashboard {
             .pixel_size(PixelSize::Full)
             .centered()
             .lines(vec![Line::from(format!("{}", time))])
-            .style(Style::new().magenta())
+            .style(Style::new().green())
             .build();
 
         let heat_block = Block::bordered()
             .title("Heating")
             .border_type(BorderType::Rounded)
             .border_style(Style::new().yellow())
-            .padding(Padding::new(1, 0, 1, 0));
+            .padding(Padding::top(1));
 
-        Paragraph::new(Line::from(format!("Heating {}", t_frame.heating_on)))
-            .wrap(Wrap { trim: true })
+        Paragraph::new(Line::from(if t_frame.heating_on { "ON" } else { "OFF" }))
             .centered()
+            .style(if t_frame.heating_on {
+                Style::new().green()
+            } else {
+                Style::new().gray()
+            })
             .block(heat_block)
             .render(col2_row2_areas[0], buf);
 
@@ -92,11 +93,15 @@ impl Board for Dashboard {
             .title("Pump")
             .border_type(BorderType::Rounded)
             .border_style(Style::new().yellow())
-            .padding(Padding::new(1, 0, 1, 0));
+            .padding(Padding::top(1));
 
-        Paragraph::new(Line::from(format!("Pump {}", t_frame.pump_on)))
-            .wrap(Wrap { trim: true })
+        Paragraph::new(Line::from(if t_frame.pump_on { "ON" } else { "OFF" }))
             .centered()
+            .style(if t_frame.pump_on {
+                Style::new().green()
+            } else {
+                Style::new().gray()
+            })
             .block(pump_block)
             .render(col2_row2_areas[1], buf);
 

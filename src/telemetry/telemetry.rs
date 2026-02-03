@@ -48,7 +48,7 @@ impl TelemetryFrame {
     pub fn debug_frame() -> Self {
         Self {
             raw_string: "C1.10,120,138,090,0000,1,0".to_string(),
-            mode: MachineMode::Coffee,
+            mode: MachineMode::SteamC,
             sw_version: "1.10".to_string(),
             boiler_now_c: 120,
             boiler_target_c: Some(138),
@@ -73,7 +73,7 @@ pub enum ParseError {
 /// Parses UART line format:
 /// <Mode><Version>,<boiler_now>,<boiler_target_or_Lxx>,<hx_now>,<boost>,<heating>,<pump>
 /// Examples:
-/// - C1.10,037,138,035,0000,1,0
+/// - C1.10,037,138,035,0000,0,1
 /// - C1.10,037,L65,035,0000,0,0
 pub fn parse_uart_line(line: &str) -> Result<TelemetryFrame, ParseError> {
     let s = line.trim();
