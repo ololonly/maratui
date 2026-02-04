@@ -28,3 +28,23 @@ MaraTUI provides a multi-screen interface for monitoring and controlling coffee 
 - UI adjustments: lifetime graphs, design improvements, animations
 - Configurable Home Assistant integration (cup count data)
 - MQTT broker integration (telemetry data and events broadcasting)
+
+## Development
+
+### Simulator (debug)
+
+Before running the simulator, install SDL2 development libraries for your OS. See the
+rust-sdl2 installation instructions:
+https://docs.rs/crate/sdl2/latest/source/README.md
+
+Then run:
+
+```
+cargo sim
+```
+
+### ESP32 (flash)
+
+```
+cargo run --release
+```
