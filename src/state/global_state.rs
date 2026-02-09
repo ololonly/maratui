@@ -1,6 +1,9 @@
 use crate::screens::Screen;
-use crate::telemetry::{MachineState, TelemetryFrame};
-use std::time::{Duration, Instant};
+use crate::telemetry::MachineState;
+use std::{
+    collections::VecDeque,
+    time::{Duration, Instant},
+};
 
 /// State of the coffee extraction process
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -77,8 +80,7 @@ pub struct GlobalAppState {
     pub extraction_state: ExtractionState,
     /// Machine state (mode, temperatures, pump, etc.)
     pub machine_state: MachineState,
-    /// Latest received telemetry frame
-    pub last_telemetry: Option<TelemetryFrame>,
+    pub events_log: VecDeque<String>,
     /// Current error (if any)
     pub error: Option<AppError>,
 }
@@ -89,7 +91,7 @@ impl Default for GlobalAppState {
             current_screen: Screen::default(),
             extraction_state: ExtractionState::default(),
             machine_state: MachineState::default(),
-            last_telemetry: None,
+            events_log: VecDeque::with_capacity(10),
             error: None,
         }
     }
@@ -168,7 +170,7 @@ mod tests {
                 last_extraction_duration: None
             }
         );
-        assert_eq!(state.last_telemetry, None);
+        assert_eq!(state.machine_state.last_frame, None);
         assert_eq!(state.error, None);
     }
 

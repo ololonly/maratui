@@ -56,7 +56,7 @@ impl TelemetryFrame {
             boost_countdown_s: 0,
             heating_on: true,
             pump_on: false,
-            no_water_code: Some(0),
+            no_water_code: None,
         }
     }
 
@@ -71,7 +71,7 @@ impl TelemetryFrame {
             boost_countdown_s: 0,
             heating_on: true,
             pump_on: true,
-            no_water_code: Some(0),
+            no_water_code: None,
         }
     }
 }
@@ -194,6 +194,7 @@ pub enum AppEvent {
 /// Runtime state used to compute derived values (pump duration, transitions).
 #[derive(Debug, Clone)]
 pub struct MachineState {
+    pub on: bool,
     pub last_frame: Option<TelemetryFrame>,
     pub last_update: Option<Instant>,
 }
@@ -201,6 +202,7 @@ pub struct MachineState {
 impl Default for MachineState {
     fn default() -> Self {
         Self {
+            on: false,
             last_frame: None,
             last_update: None,
         }

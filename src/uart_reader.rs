@@ -20,8 +20,8 @@ impl UartReader {
     ///
     /// # Parameters
     /// - `uart`: UART2 peripheral
-    /// - `tx_pin`: GPIO pin for TX (GPIO17)
-    /// - `rx_pin`: GPIO pin for RX (GPIO21, note: GPIO18 is used for SPI)
+    /// - `tx_pin`: GPIO pin for TX
+    /// - `rx_pin`: GPIO pin for RX
     ///
     /// # Configuration
     /// - Baudrate: 9600
@@ -93,7 +93,14 @@ impl UartReader {
                                     if byte == b'\n' || byte == b'\r' {
                                         if !line_buffer.is_empty() {
                                             // Send line through channel (clone because we need to clear buffer after)
-                                            let telemetry = parse_uart_line(&line_buffer).unwrap();
+                                            let telemetry = match parse_uart_line(&line_buffer) {
+                                                Ok(t) => t,
+                                                Err(_e) => {
+                                                    warn!("UART parse error: {:?}", line_buffer);
+                                                    continue;
+                                                }
+                                            };
+
                                             info!("UART line received: '{}'", &line_buffer);
                                             if tx.send(telemetry).is_err() {
                                                 // Receiver dropped, exit task

@@ -1,3 +1,5 @@
+use log::info;
+
 use crate::button::{Button, ButtonPressType};
 use crate::telemetry::{TelemetryFrame, update_state_with_events};
 use std::time::Instant;
@@ -11,6 +13,11 @@ pub struct AppStateMachine;
 impl AppStateMachine {
     /// Handle an application event and update the state
     pub fn handle_event(state: &mut GlobalAppState, event: AppEvent) {
+        info!("Handling event: {:?}", event);
+        state.events_log.push_front(format!("Event: {:?}", event));
+        if state.events_log.len() > 10 {
+            state.events_log.pop_front(); // удаляет самый старый
+        }
         match event {
             // ===== Telemetry Events =====
             AppEvent::ShotStarted => {
@@ -65,6 +72,7 @@ impl AppStateMachine {
     pub fn handle_button_press(state: &mut GlobalAppState, button: Button) {
         match button {
             Button::Button1(ButtonPressType::Short) => {
+                // Handle short press of Button1
                 Self::handle_event(state, AppEvent::NextScreen);
             }
             Button::Button2(ButtonPressType::Short) => {
@@ -89,7 +97,7 @@ impl AppStateMachine {
             update_state_with_events(&mut state.machine_state, frame.clone(), now);
 
         // Store the latest telemetry frame
-        state.last_telemetry = Some(frame);
+        state.machine_state.last_frame = Some(frame);
 
         // Process each event through the FSM
         for event in events {

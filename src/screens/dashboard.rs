@@ -20,7 +20,7 @@ impl Board for Dashboard {
         let buf = frame.buffer_mut();
 
         // Get telemetry frame or use debug frame if not available
-        let t_frame = match &state.last_telemetry {
+        let t_frame = match &state.machine_state.last_frame {
             Some(frame) => frame.clone(),
             None => TelemetryFrame::debug_frame(),
         };
@@ -84,10 +84,20 @@ impl Board for Dashboard {
                 .unwrap_or(Duration::ZERO)
                 .as_secs()
         };
+
+        let timer_block = Block::bordered()
+            .title("Extraction")
+            .border_type(BorderType::Rounded)
+            .border_style(Style::new().yellow())
+            .padding(Padding::top(1));
+
+        let timer_area = timer_block.inner(col2_areas[0]);
+        timer_block.render(col2_areas[0], buf);
+
         let big_text = BigText::builder()
             .pixel_size(PixelSize::Full)
             .centered()
-            .lines(vec![Line::from(format!("{}", extraction_time))])
+            .lines(vec![extraction_time.to_string().into()])
             .style(Style::new().green())
             .build();
 
@@ -123,6 +133,6 @@ impl Board for Dashboard {
             .block(pump_block)
             .render(col2_row2_areas[1], buf);
 
-        frame.render_widget(big_text, col2);
+        frame.render_widget(big_text, timer_area);
     }
 }
