@@ -71,6 +71,9 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                         Keycode::Down => {
                             app.update_telemetry(TelemetryFrame::debug_frame());
                         }
+                        Keycode::Space => {
+                            app.update_telemetry(TelemetryFrame::debug_no_water_frame());
+                        }
                         _ => {}
                     }
                 }

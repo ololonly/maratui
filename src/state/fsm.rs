@@ -16,7 +16,7 @@ impl AppStateMachine {
         info!("Handling event: {:?}", event);
         state.events_log.push_front(format!("Event: {:?}", event));
         if state.events_log.len() > 10 {
-            state.events_log.pop_front(); // удаляет самый старый
+            state.events_log.pop_back();
         }
         match event {
             // ===== Telemetry Events =====
