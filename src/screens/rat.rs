@@ -5,7 +5,7 @@ use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
-use ratatui::text::{Line, Span, Text};
+use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType, Paragraph, Widget, Wrap};
 use tinyqoi::Qoi;
 
@@ -43,7 +43,7 @@ impl Rat {
 
     /// Render status information text
     fn render_main_status(state: &GlobalAppState, area: Rect, buf: &mut Buffer) {
-        let [state_area, message_area, icon_area] = Layout::vertical([
+        let [state_area, message_area, _icon_area] = Layout::vertical([
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(1),

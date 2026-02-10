@@ -1302,9 +1302,9 @@ dependencies = [
 
 [[package]]
 name = "mousefood"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c895b8afcfff3579fa42ba9ad1cdedc84eddfdf1da24fcb5b1cbbc2f4eec6d12"
+checksum = "490c1ffdb94062231282102b75a38d47022faf28549c5f282aa5253354b62ff2"
 dependencies = [
  "embedded-graphics",
  "embedded-graphics-unicodefonts",
