@@ -30,6 +30,9 @@ pub enum AppEvent {
     /// Switch to the previous screen
     PreviousScreen,
 
+    /// Switch to the debug screen
+    DebugScreen,
+
     /// An error occurred
     ErrorOccurred { error: String },
 
@@ -67,6 +70,7 @@ impl AppEvent {
             self,
             AppEvent::NextScreen
                 | AppEvent::PreviousScreen
+                | AppEvent::DebugScreen
                 | AppEvent::ErrorOccurred { .. }
                 | AppEvent::ErrorCleared
         )
@@ -89,6 +93,7 @@ impl std::fmt::Display for AppEvent {
             AppEvent::WaterRefillCleared => write!(f, "Water Refill Cleared"),
             AppEvent::NextScreen => write!(f, "Next Screen"),
             AppEvent::PreviousScreen => write!(f, "Previous Screen"),
+            AppEvent::DebugScreen => write!(f, "Debug Screen"),
             AppEvent::ErrorOccurred { error } => write!(f, "Error: {}", error),
             AppEvent::ErrorCleared => write!(f, "Error Cleared"),
         }

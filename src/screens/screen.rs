@@ -19,24 +19,29 @@ pub enum Screen {
 }
 
 impl Screen {
+    fn rotatable() -> Vec<Self> {
+        Screen::iter().filter(|s| *s != Screen::Debug).collect()
+    }
+
     /// Navigate to the previous screen (wraps around)
     pub fn previous(self) -> Self {
-        let current_index: usize = self as usize;
-        let total = Screen::iter().count();
-        let previous_index = if current_index == 0 {
-            total - 1
-        } else {
-            current_index - 1
-        };
-        Self::from_repr(previous_index).unwrap_or(self)
+        let screens = Self::rotatable();
+        let pos = screens.iter().position(|s| *s == self);
+        match pos {
+            Some(i) if i == 0 => screens[screens.len() - 1],
+            Some(i) => screens[i - 1],
+            None => Screen::Main,
+        }
     }
 
     /// Navigate to the next screen (wraps around)
     pub fn next(self) -> Self {
-        let current_index = self as usize;
-        let total = Screen::iter().count();
-        let next_index = (current_index + 1) % total;
-        Self::from_repr(next_index).unwrap_or(self)
+        let screens = Self::rotatable();
+        let pos = screens.iter().position(|s| *s == self);
+        match pos {
+            Some(i) => screens[(i + 1) % screens.len()],
+            None => Screen::Main,
+        }
     }
 }
 

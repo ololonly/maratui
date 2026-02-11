@@ -128,6 +128,7 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
         let button2_pressed = button2.is_low();
 
         if button1_pressed && button2_pressed {
+            terminal.clear().unwrap();
             app.handle_press(Button::Both);
             Ets::delay_ms(100);
         } else {

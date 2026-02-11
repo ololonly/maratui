@@ -77,6 +77,11 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                         Keycode::Space => {
                             app.update_telemetry(TelemetryFrame::debug_no_water_frame());
                         }
+                        Keycode::D => {
+                            terminal.clear().unwrap();
+                            app.handle_press(Button::Both);
+                        }
+
                         _ => {}
                     }
                 }

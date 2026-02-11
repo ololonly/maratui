@@ -58,6 +58,10 @@ impl AppStateMachine {
                 state.current_screen = state.current_screen.previous();
             }
 
+            AppEvent::DebugScreen => {
+                state.current_screen = crate::screens::Screen::Debug;
+            }
+
             AppEvent::ErrorOccurred { error } => {
                 state.error = Some(AppError::MachineOffline);
                 // Log the error (logging can be added here)
@@ -87,7 +91,7 @@ impl AppStateMachine {
                 // Reserved for future use
             }
             Button::Both => {
-                // Reserved for future use
+                Self::handle_event(state, AppEvent::DebugScreen);
             }
         }
     }
