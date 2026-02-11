@@ -1,11 +1,13 @@
-sim:
 ifeq ($(OS),Windows_NT)
-	cargo simwin
+  SIM_CMD = cargo simwin
 else
-	UNAME_S := $(shell uname -s)
-	ifeq ($(UNAME_S),Darwin)
-		cargo simmac
-	else
-		cargo sim
-	endif
+  UNAME_S := $(shell uname -s)
+  ifeq ($(UNAME_S),Darwin)
+    SIM_CMD = cargo simmac
+  else
+    SIM_CMD = cargo sim
+  endif
 endif
+
+sim:
+	$(SIM_CMD)
