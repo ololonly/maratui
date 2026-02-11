@@ -1,7 +1,7 @@
 use crate::button::Button;
 use crate::run_app;
 use crate::screens::{Board, Dashboard, Debug, Graphs, Rat, Screen};
-use crate::state::{AppStateMachine, GlobalAppState};
+use crate::state::{AppError, AppStateMachine, GlobalAppState};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::Drawable;
 use mousefood::embedded_graphics::image::{Image, ImageRaw, ImageRawBE};
@@ -95,7 +95,13 @@ impl MaraUiApp for MaraUi {
             return;
         }
 
-        let image_data = include_bytes!("../assets/rat_barista.raw");
+        let image_data: &[u8];
+
+        if let Some(AppError::WaterRefillNeeded { .. }) = self.state.error {
+            image_data = include_bytes!("../assets/rat_barista_thirsty.raw");
+        } else {
+            image_data = include_bytes!("../assets/rat_barista.raw");
+        }
 
         let image = ImageRawBE::new(image_data, 180);
 
