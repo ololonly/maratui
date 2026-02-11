@@ -1,4 +1,3 @@
-use crate::qoi_widget::QoiImage;
 use crate::screens::screen::Board;
 use crate::state::{AppError, GlobalAppState};
 use ratatui::Frame;
@@ -7,7 +6,6 @@ use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, BorderType, Paragraph, Widget, Wrap};
-use tinyqoi::Qoi;
 
 /// Main screen with rat barista mascot and system status
 #[derive(Default)]
@@ -28,15 +26,6 @@ impl Rat {
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
             .split(area);
 
-        // Left area: render QOI image as Ratatui widget
-        let rat_area = layout[0];
-        let data = include_bytes!("../../assets/rat_barista.qoi");
-        let qoi = Qoi::new(data).unwrap();
-        let image_widget = QoiImage::new(&qoi);
-
-        image_widget.render(rat_area, buf);
-
-        // Render status text on the right
         let status_area = layout[1];
         Self::render_main_status(state, status_area, buf);
     }

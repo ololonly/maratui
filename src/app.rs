@@ -3,6 +3,10 @@ use crate::run_app;
 use crate::screens::{Board, Dashboard, Debug, Graphs, Rat, Screen};
 use crate::state::{AppStateMachine, GlobalAppState};
 use crate::telemetry::TelemetryFrame;
+use mousefood::embedded_graphics::Drawable;
+use mousefood::embedded_graphics::image::{Image, ImageRaw, ImageRawBE};
+use mousefood::embedded_graphics::prelude::{DrawTarget, OriginDimensions, Point};
+use mousefood::prelude::Rgb565;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
@@ -22,6 +26,11 @@ pub trait MaraUiApp {
 
     /// Update application state with telemetry data
     fn update_telemetry(&mut self, telemetry: TelemetryFrame);
+
+    fn render_image<D>(&mut self, display: &mut D)
+    where
+        D: DrawTarget<Color = Rgb565> + OriginDimensions,
+        D::Error: core::fmt::Debug;
 
     /// Run the application
     ///
@@ -75,6 +84,24 @@ impl MaraUiApp for MaraUi {
     fn update_telemetry(&mut self, telemetry: TelemetryFrame) {
         let now = Instant::now();
         AppStateMachine::handle_telemetry_frame(&mut self.state, telemetry, now);
+    }
+
+    fn render_image<D>(&mut self, display: &mut D)
+    where
+        D: DrawTarget<Color = Rgb565> + OriginDimensions,
+        D::Error: core::fmt::Debug,
+    {
+        if self.state.current_screen != Screen::Main {
+            return;
+        }
+
+        let image_data = include_bytes!("../assets/rat_barista.raw");
+
+        let image = ImageRawBE::new(image_data, 180);
+
+        let im: Image<'_, ImageRaw<'_, Rgb565>> = Image::new(&image, Point::new(5, 60));
+
+        im.draw(display).unwrap();
     }
 }
 

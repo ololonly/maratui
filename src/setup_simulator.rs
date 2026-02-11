@@ -43,6 +43,7 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
     let mut terminal = Terminal::new(backend).unwrap();
 
     loop {
+        app.render_image(terminal.backend_mut().display_mut());
         terminal
             .draw(|f| {
                 app.draw(f);
@@ -60,9 +61,11 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                     }
                     match keycode {
                         Keycode::Left => {
+                            terminal.clear().unwrap();
                             app.handle_press(Button::Button2(ButtonPressType::Short));
                         }
                         Keycode::Right => {
+                            terminal.clear().unwrap();
                             app.handle_press(Button::Button1(ButtonPressType::Short));
                         }
                         Keycode::Up => {

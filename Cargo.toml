@@ -22,7 +22,6 @@ mousefood = { version = "0.4.0", default-features=false, features = ["fonts"] }
 ratatui = {version = "0.30.0", default-features = false}
 strum = "0.27.2"
 strum_macros = "0.27.2"
-tinyqoi = "0.2.0"
 tui-widgets = {version = "0.7.0", default-features=false, features=["big-text"]}
 
 [build-dependencies]

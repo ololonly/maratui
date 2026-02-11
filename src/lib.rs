@@ -12,9 +12,6 @@ pub use setup_simulator::run_app;
 /// Button handling.
 pub mod button;
 
-/// QOI image widget for Ratatui.
-pub mod qoi_widget;
-
 pub mod telemetry;
 
 pub mod screens;

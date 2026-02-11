@@ -1,8 +1,7 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonState};
 use crate::telemetry::TelemetryFrame;
-use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor, Size};
-use mousefood::embedded_graphics::primitives::Rectangle;
+use mousefood::embedded_graphics::prelude::{DrawTarget, RgbColor};
 use mousefood::fonts::*;
 use mousefood::prelude::*;
 use ratatui::Terminal;
@@ -51,12 +50,7 @@ fn get_ili9341<'a>(
     )
     .unwrap();
 
-    display
-        .fill_solid(
-            &Rectangle::new(Point::new(0, 0), Size::new(320, 240)),
-            Rgb565::BLACK,
-        )
-        .unwrap();
+    display.clear(Rgb565::BLACK).unwrap();
     Ok(display)
 }
 
@@ -135,10 +129,12 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             Ets::delay_ms(100);
         } else {
             button1_state.update(button1_pressed, |press_type| {
+                terminal.clear().unwrap();
                 app.handle_press(Button::Button1(press_type));
             });
 
             button2_state.update(button2_pressed, |press_type| {
+                terminal.clear().unwrap();
                 app.handle_press(Button::Button2(press_type));
             });
         }
@@ -146,6 +142,7 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
         while let Ok(telemetry) = rx.try_recv() {
             app.update_telemetry(telemetry);
         }
+        app.render_image(terminal.backend_mut().display_mut());
 
         terminal
             .draw(|f| {
