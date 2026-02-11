@@ -6,7 +6,7 @@ edition = "2024"
 [features]
 default = ["device"]
 # Build for ESP. cargo build / cargo build --release
-device = ["dep:esp-idf-svc", "dep:ili9341", "dep:display-interface-spi"]
+device = ["dep:esp-idf-svc", "dep:ili9341", "dep:display-interface-spi", "dep:embuild"]
 # Build UI on host. cargo sim --target <host>
 simulator = ["dep:embedded-graphics-simulator"]
 
@@ -26,7 +26,7 @@ tinyqoi = "0.2.0"
 tui-widgets = {version = "0.7.0", default-features=false, features=["big-text"]}
 
 [build-dependencies]
-embuild = { version = "0.33", features = ["espidf"] }
+embuild = { version = "0.33", features = ["espidf"], optional = true }
 
 [profile.release]
 opt-level = 3

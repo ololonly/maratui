@@ -37,11 +37,19 @@ Before running the simulator, install SDL2 development libraries for your OS. Se
 rust-sdl2 installation instructions:
 https://docs.rs/crate/sdl2/latest/source/README.md
 
-Then run:
+Then run the simulator with auto-detected platform target:
 
 ```
-cargo sim
+make sim
 ```
+
+Or use platform-specific cargo aliases directly:
+
+| OS      | Command        |
+|---------|----------------|
+| Linux   | `cargo sim`    |
+| macOS   | `cargo simmac` |
+| Windows | `cargo simwin` |
 
 ### ESP32 (flash)
 
