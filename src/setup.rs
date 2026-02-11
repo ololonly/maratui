@@ -35,7 +35,10 @@ fn get_ili9341<'a>(
     let rst = PinDriver::output(rst).unwrap();
     let dc = PinDriver::output(dc).unwrap();
     let driver_config = Default::default();
-    let spi_config = SpiConfig::new().baudrate(20u32.MHz().into());
+    let spi_config = SpiConfig::new()
+        .baudrate(Hertz(20_000_000))
+        .duplex(esp_idf_svc::hal::spi::config::Duplex::Half)
+        .into();
     let spi = SpiDeviceDriver::new_single(spi_p, sclk, mosi, sdi, cs, &driver_config, &spi_config)
         .unwrap();
 
