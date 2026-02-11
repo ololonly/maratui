@@ -8,13 +8,7 @@ use mousefood::embedded_graphics::image::{Image, ImageRaw, ImageRawBE};
 use mousefood::embedded_graphics::prelude::{DrawTarget, OriginDimensions, Point};
 use mousefood::prelude::Rgb565;
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::Style;
-use ratatui::symbols;
-use ratatui::widgets::Tabs;
-use ratatui::widgets::Widget;
 use std::time::Instant;
-use strum::IntoEnumIterator;
 
 /// Application trait to be implemented by the user
 pub trait MaraUiApp {
@@ -55,24 +49,13 @@ impl MaraUiApp for MaraUi {
     /// Draw the UI frame
     /// This is being called in the main loop to render the UI
     fn draw(&self, frame: &mut Frame) {
-        let titles = Screen::iter().map(|s| s.to_string());
-        let selected_tab_index = self.state.current_screen as usize;
-
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .spacing(1)
-            .constraints([Constraint::Length(1), Constraint::Fill(1)])
-            .split(frame.area());
-
-        Tabs::new(titles)
-            .style(Style::default().cyan().underlined())
-            .highlight_style(Style::default().yellow())
-            .select(selected_tab_index)
-            .divider(symbols::DOT)
-            .padding(" ", " ")
-            .render(layout[0], frame.buffer_mut());
-
-        self.render_tab_content(layout[1], frame);
+        let area = frame.area();
+        match self.state.current_screen {
+            Screen::Main => Rat::render(&self.state, area, frame),
+            Screen::Dashboard => Dashboard::render(&self.state, area, frame),
+            Screen::Graphs => Graphs::render(&self.state, area, frame),
+            Screen::Debug => Debug::render(&self.state, area, frame),
+        }
     }
 
     /// Handle button press events
@@ -108,17 +91,5 @@ impl MaraUiApp for MaraUi {
         let im: Image<'_, ImageRaw<'_, Rgb565>> = Image::new(&image, Point::new(5, 60));
 
         im.draw(display).unwrap();
-    }
-}
-
-impl MaraUi {
-    /// Render the content of the current screen
-    fn render_tab_content(&self, area: Rect, frame: &mut Frame) {
-        match self.state.current_screen {
-            Screen::Main => Rat::render(&self.state, area, frame),
-            Screen::Dashboard => Dashboard::render(&self.state, area, frame),
-            Screen::Graphs => Graphs::render(&self.state, area, frame),
-            Screen::Debug => Debug::render(&self.state, area, frame),
-        }
     }
 }
