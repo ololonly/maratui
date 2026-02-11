@@ -1,5 +1,5 @@
 // src/telemetry.rs
-use std::time::Instant;
+use std::{collections::VecDeque, time::Instant};
 use strum::Display;
 
 #[derive(Debug, Display, Default, Clone, Copy, PartialEq, Eq)]
@@ -77,12 +77,12 @@ impl TelemetryFrame {
 
     pub fn debug_no_water_frame() -> Self {
         Self {
-            raw_string: "C1.10,037,L65,035,0000,0,0".to_string(),
+            raw_string: "C1.10,122,L65,085,0000,0,0".to_string(),
             mode: MachineMode::Coffee,
             sw_version: "1.10".to_string(),
-            boiler_now_c: 37,
+            boiler_now_c: 122,
             boiler_target_c: None,
-            hx_now_c: 35,
+            hx_now_c: 85,
             boost_countdown_s: 0,
             heating_on: false,
             pump_on: false,
@@ -212,6 +212,9 @@ pub struct MachineState {
     pub on: bool,
     pub last_frame: Option<TelemetryFrame>,
     pub last_update: Option<Instant>,
+    pub target_boiler_data: VecDeque<f64>,
+    pub current_boiler_data: VecDeque<f64>,
+    pub current_hx_data: VecDeque<f64>,
 }
 
 impl Default for MachineState {
@@ -220,6 +223,9 @@ impl Default for MachineState {
             on: false,
             last_frame: None,
             last_update: None,
+            target_boiler_data: VecDeque::with_capacity(300),
+            current_boiler_data: VecDeque::with_capacity(300),
+            current_hx_data: VecDeque::with_capacity(300),
         }
     }
 }

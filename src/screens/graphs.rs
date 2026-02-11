@@ -12,9 +12,30 @@ use crate::state::GlobalAppState;
 pub struct Graphs;
 
 impl Board for Graphs {
-    fn render(_state: &GlobalAppState, area: Rect, frame: &mut Frame) {
-        let points = Self::demo_dataset();
-        let points2 = Self::demo_dataset2();
+    fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
+        let hx_states: Vec<(f64, f64)> = state
+            .machine_state
+            .current_hx_data
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (i as f64, v))
+            .collect();
+
+        let curr_boiler_states: Vec<(f64, f64)> = state
+            .machine_state
+            .current_boiler_data
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (i as f64, v))
+            .collect();
+
+        let target_boiler_states: Vec<(f64, f64)> = state
+            .machine_state
+            .target_boiler_data
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (i as f64, v))
+            .collect();
 
         let datasets = vec![
             Dataset::default()
@@ -22,60 +43,39 @@ impl Board for Graphs {
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Yellow))
                 .graph_type(GraphType::Line)
-                .data(&points),
+                .data(&curr_boiler_states),
             Dataset::default()
                 .name("Target temperature")
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Red))
                 .graph_type(GraphType::Line)
-                .data(&points2),
+                .data(&target_boiler_states),
+            Dataset::default()
+                .name("HX temperature")
+                .marker(symbols::Marker::Braille)
+                .style(Style::default().fg(Color::Blue))
+                .graph_type(GraphType::Line)
+                .data(&hx_states),
         ];
 
         let chart = Chart::new(datasets)
             .block(Block::bordered().title(Line::from("Line chart").cyan().bold().centered()))
             .x_axis(
                 Axis::default()
-                    .title("Time")
                     .style(Style::default().gray())
-                    .bounds([0.0, 360.0]),
+                    .labels(["-5 min", "Now"])
+                    .bounds([0.0, 300.0]),
             )
             .y_axis(
                 Axis::default()
                     .title("Temp")
                     .style(Style::default().gray())
-                    .bounds([0.0, 140.0]),
+                    .labels(["30°", "90°", "150°"])
+                    .bounds([30.0, 150.0]),
             )
-            .legend_position(Some(LegendPosition::TopLeft))
-            .hidden_legend_constraints((Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)));
+            .legend_position(Some(LegendPosition::BottomRight))
+            .hidden_legend_constraints((Constraint::Min(0), Constraint::Ratio(1, 2)));
 
         frame.render_widget(chart, area);
-    }
-}
-
-impl Graphs {
-    /// Generate demo dataset for current temperature
-    fn demo_dataset() -> Vec<(f64, f64)> {
-        let mut data = Vec::new();
-
-        for i in 0..360 {
-            let x = i as f64;
-            let y = (i / 2) as f64;
-            data.push((x, y));
-        }
-
-        data
-    }
-
-    /// Generate demo dataset for target temperature
-    fn demo_dataset2() -> Vec<(f64, f64)> {
-        let mut data = Vec::new();
-
-        for i in 0..360 {
-            let x = i as f64;
-            let y = 128 as f64;
-            data.push((x, y));
-        }
-
-        data
     }
 }

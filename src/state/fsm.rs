@@ -1,10 +1,9 @@
 use log::info;
 
+use super::{AppError, AppEvent, ExtractionState, GlobalAppState};
 use crate::button::{Button, ButtonPressType};
 use crate::telemetry::{TelemetryFrame, update_state_with_events};
 use std::time::Instant;
-
-use super::{AppError, AppEvent, ExtractionState, GlobalAppState};
 
 /// Application state machine
 /// Handles events and updates the global application state
@@ -14,9 +13,12 @@ impl AppStateMachine {
     /// Handle an application event and update the state
     pub fn handle_event(state: &mut GlobalAppState, event: AppEvent) {
         info!("Handling event: {:?}", event);
-        state.events_log.push_front(format!("Event: {:?}", event));
-        if state.events_log.len() > 10 {
-            state.events_log.pop_back();
+
+        if event.is_telemetry_event() {
+            state.events_log.push_front(format!("Event: {:?}", event));
+            if state.events_log.len() > 10 {
+                state.events_log.pop_back();
+            }
         }
         match event {
             // ===== Telemetry Events =====
@@ -95,6 +97,72 @@ impl AppStateMachine {
         // Update MachineState and get derived events
         let (_snapshot, events) =
             update_state_with_events(&mut state.machine_state, frame.clone(), now);
+
+        if state.machine_state.target_boiler_data.len() > 300 {
+            state.machine_state.target_boiler_data.pop_front();
+            state.machine_state.target_boiler_data.pop_front();
+            state.machine_state.target_boiler_data.pop_front();
+            state.machine_state.current_boiler_data.pop_front();
+            state.machine_state.current_boiler_data.pop_front();
+            state.machine_state.current_boiler_data.pop_front();
+            state.machine_state.current_hx_data.pop_front();
+            state.machine_state.current_hx_data.pop_front();
+            state.machine_state.current_hx_data.pop_front();
+        }
+
+        if let Some(boiler_target_c) = frame.boiler_target_c {
+            state
+                .machine_state
+                .target_boiler_data
+                .push_back(boiler_target_c.into());
+            state
+                .machine_state
+                .target_boiler_data
+                .push_back(boiler_target_c.into());
+            state
+                .machine_state
+                .target_boiler_data
+                .push_back(boiler_target_c.into());
+        } else {
+            state
+                .machine_state
+                .target_boiler_data
+                .push_back(f64::default());
+            state
+                .machine_state
+                .target_boiler_data
+                .push_back(f64::default());
+            state
+                .machine_state
+                .target_boiler_data
+                .push_back(f64::default());
+        }
+        let boiler_now_c = frame.boiler_now_c;
+        state
+            .machine_state
+            .current_boiler_data
+            .push_back(boiler_now_c.into());
+        state
+            .machine_state
+            .current_boiler_data
+            .push_back(boiler_now_c.into());
+        state
+            .machine_state
+            .current_boiler_data
+            .push_back(boiler_now_c.into());
+        let hx_now_c = frame.hx_now_c;
+        state
+            .machine_state
+            .current_hx_data
+            .push_back(hx_now_c.into());
+        state
+            .machine_state
+            .current_hx_data
+            .push_back(hx_now_c.into());
+        state
+            .machine_state
+            .current_hx_data
+            .push_back(hx_now_c.into());
 
         // Store the latest telemetry frame
         state.machine_state.last_frame = Some(frame);
