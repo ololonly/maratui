@@ -1,5 +1,6 @@
 /// Application setup.
 pub mod app;
+pub mod config;
 #[cfg(not(feature = "simulator"))]
 mod setup;
 #[cfg(not(feature = "simulator"))]

@@ -1,5 +1,6 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonState};
+use crate::config::AppConfig;
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::{DrawTarget, RgbColor};
 use mousefood::fonts::*;
@@ -8,12 +9,17 @@ use ratatui::Terminal;
 
 use crate::uart_reader::UartReader;
 use display_interface_spi::SPIInterface;
+use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio27, Gpio33, InterruptType, Output, PinDriver};
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::spi::{SPI2, SpiConfig, SpiDeviceDriver, SpiDriver};
+use esp_idf_svc::mqtt::client::{EspMqttClient, MqttClientConfiguration, MqttProtocolVersion, QoS};
+use esp_idf_svc::nvs::EspDefaultNvsPartition;
+use esp_idf_svc::wifi::{AuthMethod, BlockingWifi, ClientConfiguration, Configuration, EspWifi};
 use ili9341::{DisplaySize240x320, Ili9341, Orientation};
 use log::{info, warn};
+use std::time::Duration;
 
 type DisplayResult<'a> = anyhow::Result<
     Ili9341<
@@ -64,7 +70,9 @@ pub fn run_app(app: impl MaraUiApp) {
 }
 
 fn run_app_hardware(mut app: impl MaraUiApp) {
+    let app_config = AppConfig::from_env().expect("Invalid MARATUI_* configuration");
     let peripherals = Peripherals::take().unwrap();
+    let modem = peripherals.modem;
     let spi_p = peripherals.spi2;
     let dc = peripherals.pins.gpio27;
     let mosi = peripherals.pins.gpio13;
@@ -97,6 +105,8 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 
     let backend = EmbeddedBackend::new(&mut display, config);
     let mut terminal = Terminal::new(backend).unwrap();
+
+    let (_wifi, mut mqtt_client) = init_networking(modem, &app_config);
 
     let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
 
@@ -144,6 +154,9 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
         }
 
         while let Ok(telemetry) = rx.try_recv() {
+            if let Some(client) = mqtt_client.as_mut() {
+                publish_telemetry(client, &app_config, &telemetry);
+            }
             app.update_telemetry(telemetry);
         }
         app.render_image(terminal.backend_mut().display_mut());
@@ -153,5 +166,100 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
                 app.draw(f);
             })
             .unwrap();
+    }
+}
+
+fn init_networking(
+    modem: esp_idf_svc::hal::modem::Modem,
+    app_config: &AppConfig,
+) -> (Option<EspWifi<'static>>, Option<EspMqttClient<'static>>) {
+    let sys_loop = EspSystemEventLoop::take().expect("Failed to take system event loop");
+    let nvs = EspDefaultNvsPartition::take().ok();
+
+    let wifi_cfg = app_config
+        .wifi
+        .as_ref()
+        .expect("Wi-Fi config is required on device");
+
+    let mut esp_wifi = EspWifi::new(modem, sys_loop.clone(), nvs).expect("Failed to create Wi-Fi");
+    {
+        let mut wifi =
+            BlockingWifi::wrap(&mut esp_wifi, sys_loop.clone()).expect("Failed to wrap Wi-Fi");
+
+        let auth_method = if wifi_cfg.password.is_empty() {
+            AuthMethod::None
+        } else {
+            AuthMethod::WPA2Personal
+        };
+
+        wifi.set_configuration(&Configuration::Client(ClientConfiguration {
+            ssid: wifi_cfg.ssid.as_str().try_into().expect("SSID too long"),
+            password: wifi_cfg
+                .password
+                .as_str()
+                .try_into()
+                .expect("password too long"),
+            auth_method,
+            ..Default::default()
+        }))
+        .expect("Failed to set Wi-Fi config");
+
+        wifi.start().expect("Failed to start Wi-Fi");
+        wifi.connect().expect("Failed to connect Wi-Fi");
+        wifi.wait_netif_up().expect("Failed to obtain IP");
+    }
+
+    info!("Wi-Fi connected");
+
+    if !app_config.mqtt.enabled {
+        info!("MQTT is disabled by MARATUI_MQTT_ENABLED");
+        return (Some(esp_wifi), None);
+    }
+
+    let mqtt_client = EspMqttClient::new_cb(
+        &app_config.mqtt.url,
+        &MqttClientConfiguration {
+            protocol_version: Some(MqttProtocolVersion::V3_1_1),
+            client_id: Some(app_config.mqtt.client_id.as_str()),
+            username: app_config.mqtt.username.as_deref(),
+            password: app_config.mqtt.password.as_deref(),
+            reconnect_timeout: Some(Duration::from_secs(2)),
+            network_timeout: Duration::from_secs(5),
+            keep_alive_interval: Some(Duration::from_secs(30)),
+            ..Default::default()
+        },
+        |event| {
+            info!("MQTT event: {}", event.payload());
+        },
+    )
+    .expect("Failed to create MQTT client");
+
+    info!("MQTT started: {}", app_config.mqtt.url);
+    (Some(esp_wifi), Some(mqtt_client))
+}
+
+fn publish_telemetry(client: &mut EspMqttClient<'_>, cfg: &AppConfig, telemetry: &TelemetryFrame) {
+    let topic = cfg.telemetry_topic();
+    let payload = format!(
+        "{{\"mode\":\"{}\",\"sw\":\"{}\",\"boiler_now_c\":{},\"boiler_target_c\":{},\"hx_now_c\":{},\"boost_countdown_s\":{},\"heating_on\":{},\"pump_on\":{},\"no_water_code\":{}}}",
+        telemetry.mode,
+        telemetry.sw_version,
+        telemetry.boiler_now_c,
+        telemetry
+            .boiler_target_c
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "null".to_string()),
+        telemetry.hx_now_c,
+        telemetry.boost_countdown_s,
+        telemetry.heating_on,
+        telemetry.pump_on,
+        telemetry
+            .no_water_code
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "null".to_string())
+    );
+
+    if let Err(e) = client.publish(&topic, QoS::AtMostOnce, false, payload.as_bytes()) {
+        warn!("Failed to publish MQTT telemetry: {:?}", e);
     }
 }
