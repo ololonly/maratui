@@ -104,6 +104,7 @@ pub struct GlobalAppState {
     pub events_log: VecDeque<String>,
     pub wifi_status: ConnectionStatus,
     pub mqtt_status: ConnectionStatus,
+    pub cup_counter: Option<u64>,
     pub outbound_mqtt: VecDeque<MqttOutboundMessage>,
     /// Current error (if any)
     pub error: Option<AppError>,
@@ -118,6 +119,7 @@ impl Default for GlobalAppState {
             events_log: VecDeque::with_capacity(10),
             wifi_status: ConnectionStatus::default(),
             mqtt_status: ConnectionStatus::default(),
+            cup_counter: None,
             outbound_mqtt: VecDeque::with_capacity(32),
             error: None,
         }
@@ -217,6 +219,7 @@ mod tests {
             }
         );
         assert_eq!(state.machine_state.last_frame, None);
+        assert_eq!(state.cup_counter, None);
         assert_eq!(state.error, None);
     }
 

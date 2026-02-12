@@ -15,11 +15,14 @@ use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio27, Gpio33, InterruptType, Output, PinDriver};
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::spi::{SPI2, SpiConfig, SpiDeviceDriver, SpiDriver};
-use esp_idf_svc::mqtt::client::{EspMqttClient, MqttClientConfiguration, MqttProtocolVersion, QoS};
+use esp_idf_svc::mqtt::client::{
+    EspMqttClient, EventPayload, MqttClientConfiguration, MqttProtocolVersion, QoS,
+};
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use esp_idf_svc::wifi::{AuthMethod, BlockingWifi, ClientConfiguration, Configuration, EspWifi};
 use ili9341::{DisplaySize240x320, Ili9341, Orientation};
 use log::{info, warn};
+use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
 type DisplayResult<'a> = anyhow::Result<
@@ -110,7 +113,7 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connecting));
     app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));
 
-    let (_wifi, mut mqtt_client) = init_networking(modem, &app_config);
+    let (_wifi, mut mqtt_client, mut cup_counter_rx) = init_networking(modem, &app_config);
 
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connected));
     if mqtt_client.is_some() {
@@ -168,6 +171,12 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             app.update_telemetry(telemetry);
         }
 
+        if let Some(cup_counter_rx) = cup_counter_rx.as_mut() {
+            while let Ok(cups) = cup_counter_rx.try_recv() {
+                app.handle_event(AppEvent::CupCounterUpdated { cups });
+            }
+        }
+
         for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
             publish_mqtt_message(&mut mqtt_client, &app_config, &topic_suffix, &payload);
         }
@@ -185,7 +194,11 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 fn init_networking(
     modem: esp_idf_svc::hal::modem::Modem,
     app_config: &AppConfig,
-) -> (Option<EspWifi<'static>>, Option<EspMqttClient<'static>>) {
+) -> (
+    Option<EspWifi<'static>>,
+    Option<EspMqttClient<'static>>,
+    Option<Receiver<u64>>,
+) {
     let sys_loop = EspSystemEventLoop::take().expect("Failed to take system event loop");
     let nvs = EspDefaultNvsPartition::take().ok();
 
@@ -226,10 +239,14 @@ fn init_networking(
 
     if !app_config.mqtt.enabled {
         info!("MQTT is disabled by MARATUI_MQTT_ENABLED");
-        return (Some(esp_wifi), None);
+        return (Some(esp_wifi), None, None);
     }
 
-    let mqtt_client = EspMqttClient::new_cb(
+    let cup_counter_topic = format!("{}/cup_counter", app_config.mqtt.topic_prefix);
+    let callback_topic = cup_counter_topic.clone();
+    let (cup_counter_tx, cup_counter_rx) = mpsc::channel::<u64>();
+
+    let mut mqtt_client = EspMqttClient::new_cb(
         &app_config.mqtt.url,
         &MqttClientConfiguration {
             protocol_version: Some(MqttProtocolVersion::V3_1_1),
@@ -241,14 +258,38 @@ fn init_networking(
             keep_alive_interval: Some(Duration::from_secs(30)),
             ..Default::default()
         },
-        |event| {
-            info!("MQTT event: {}", event.payload());
+        move |event| match event.payload() {
+            EventPayload::Received {
+                topic: Some(topic),
+                data,
+                ..
+            } if topic == callback_topic => {
+                match core::str::from_utf8(data)
+                    .ok()
+                    .map(str::trim)
+                    .and_then(|s| s.parse::<u64>().ok())
+                {
+                    Some(cups) => {
+                        let _ = cup_counter_tx.send(cups);
+                    }
+                    None => {
+                        warn!("Failed to parse cup counter payload: {:?}", data);
+                    }
+                }
+            }
+            payload => {
+                info!("MQTT event: {}", payload);
+            }
         },
     )
     .expect("Failed to create MQTT client");
 
+    if let Err(e) = mqtt_client.subscribe(&cup_counter_topic, QoS::AtMostOnce) {
+        warn!("Failed to subscribe to {}: {:?}", cup_counter_topic, e);
+    }
+
     info!("MQTT started: {}", app_config.mqtt.url);
-    (Some(esp_wifi), Some(mqtt_client))
+    (Some(esp_wifi), Some(mqtt_client), Some(cup_counter_rx))
 }
 
 fn publish_mqtt_message(

@@ -32,7 +32,7 @@ impl Rat {
 
     /// Render status information text
     fn render_main_status(state: &GlobalAppState, area: Rect, buf: &mut Buffer) {
-        let [state_area, message_area, _icon_area] = Layout::vertical([
+        let [state_area, message_area, icon_area] = Layout::vertical([
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(1),
@@ -59,5 +59,16 @@ impl Rat {
             .alignment(Alignment::Center)
             .wrap(Wrap { trim: true })
             .render(message_area, buf);
+
+        let counter_text = vec![
+            Line::raw("Total shots brewed:"),
+            Line::raw(state.cup_counter.unwrap_or(0).to_string()),
+        ];
+
+        Paragraph::new(counter_text)
+            .block(Block::bordered().border_type(BorderType::Rounded))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true })
+            .render(icon_area, buf);
     }
 }

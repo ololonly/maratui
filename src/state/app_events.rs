@@ -47,6 +47,9 @@ pub enum AppEvent {
     /// MQTT status changed
     MqttStatusChanged(ConnectionStatus),
 
+    /// Cup counter value updated from MQTT retained/incoming message
+    CupCounterUpdated { cups: u64 },
+
     /// Request publish custom app event to MQTT
     PublishMqttEvent {
         topic_suffix: String,
@@ -77,6 +80,7 @@ impl AppEvent {
                 | AppEvent::WaterRefillCleared
                 | AppEvent::WifiStatusChanged(..)
                 | AppEvent::MqttStatusChanged(..)
+                | AppEvent::CupCounterUpdated { .. }
                 | AppEvent::PublishMqttEvent { .. }
         )
     }
@@ -115,6 +119,7 @@ impl std::fmt::Display for AppEvent {
             AppEvent::ErrorCleared => write!(f, "Error Cleared"),
             AppEvent::WifiStatusChanged(status) => write!(f, "Wi-Fi status: {:?}", status),
             AppEvent::MqttStatusChanged(status) => write!(f, "MQTT status: {:?}", status),
+            AppEvent::CupCounterUpdated { cups } => write!(f, "Cup counter updated: {}", cups),
             AppEvent::PublishMqttEvent {
                 topic_suffix,
                 payload,

@@ -80,6 +80,10 @@ impl AppStateMachine {
                 state.mqtt_status = status;
             }
 
+            AppEvent::CupCounterUpdated { cups } => {
+                state.cup_counter = Some(cups);
+            }
+
             AppEvent::PublishMqttEvent {
                 topic_suffix,
                 payload,
@@ -398,5 +402,15 @@ mod tests {
         assert!(state.extraction_state.is_extracting());
         // Previous duration should be cleared when new extraction starts
         assert_eq!(state.extraction_state.last_extraction_duration(), None);
+    }
+
+    #[test]
+    fn test_handle_cup_counter_updated() {
+        let mut state = GlobalAppState::default();
+        assert_eq!(state.cup_counter, None);
+
+        AppStateMachine::handle_event(&mut state, AppEvent::CupCounterUpdated { cups: 42 });
+
+        assert_eq!(state.cup_counter, Some(42));
     }
 }
