@@ -71,6 +71,21 @@ impl AppStateMachine {
             AppEvent::ErrorCleared => {
                 state.error = None;
             }
+
+            AppEvent::WifiStatusChanged(status) => {
+                state.wifi_status = status;
+            }
+
+            AppEvent::MqttStatusChanged(status) => {
+                state.mqtt_status = status;
+            }
+
+            AppEvent::PublishMqttEvent {
+                topic_suffix,
+                payload,
+            } => {
+                state.enqueue_mqtt_message(topic_suffix, payload);
+            }
         }
     }
 
@@ -98,6 +113,8 @@ impl AppStateMachine {
 
     /// Handle telemetry frame updates
     pub fn handle_telemetry_frame(state: &mut GlobalAppState, frame: TelemetryFrame, now: Instant) {
+        state.enqueue_mqtt_message("telemetry", telemetry_payload(&frame));
+
         // Update MachineState and get derived events
         let (_snapshot, events) =
             update_state_with_events(&mut state.machine_state, frame.clone(), now);
@@ -173,8 +190,10 @@ impl AppStateMachine {
 
         // Process each event through the FSM
         for event in events {
-            let app_event = AppEvent::from_telemetry(event);
+            let app_event = AppEvent::from_telemetry(event.clone());
             Self::handle_event(state, app_event);
+            let event_payload = telemetry_event_payload(&event);
+            state.enqueue_mqtt_message("events", event_payload);
         }
     }
 
@@ -182,6 +201,46 @@ impl AppStateMachine {
     pub fn handle_events(state: &mut GlobalAppState, events: Vec<AppEvent>) {
         for event in events {
             Self::handle_event(state, event);
+        }
+    }
+}
+
+fn telemetry_payload(frame: &TelemetryFrame) -> String {
+    format!(
+        "{{\"mode\":\"{}\",\"sw\":\"{}\",\"boiler_now_c\":{},\"boiler_target_c\":{},\"hx_now_c\":{},\"boost_countdown_s\":{},\"heating_on\":{},\"pump_on\":{},\"no_water_code\":{}}}",
+        frame.mode,
+        frame.sw_version,
+        frame.boiler_now_c,
+        frame
+            .boiler_target_c
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "null".to_string()),
+        frame.hx_now_c,
+        frame.boost_countdown_s,
+        frame.heating_on,
+        frame.pump_on,
+        frame
+            .no_water_code
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "null".to_string())
+    )
+}
+
+fn telemetry_event_payload(event: &crate::telemetry::AppEvent) -> String {
+    match event {
+        crate::telemetry::AppEvent::ShotStarted => "{\"type\":\"shot_started\"}".to_string(),
+        crate::telemetry::AppEvent::ShotEnded => "{\"type\":\"shot_ended\"}".to_string(),
+        crate::telemetry::AppEvent::WaterRefillNeeded { code } => {
+            format!("{{\"type\":\"water_refill_needed\",\"code\":{}}}", code)
+        }
+        crate::telemetry::AppEvent::WaterRefillCleared => {
+            "{\"type\":\"water_refill_cleared\"}".to_string()
+        }
+        crate::telemetry::AppEvent::ModeChanged { from, to } => {
+            format!(
+                "{{\"type\":\"mode_changed\",\"from\":\"{}\",\"to\":\"{}\"}}",
+                from, to
+            )
         }
     }
 }

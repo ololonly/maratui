@@ -1,6 +1,7 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonState};
 use crate::config::AppConfig;
+use crate::state::{AppEvent, ConnectionStatus};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::{DrawTarget, RgbColor};
 use mousefood::fonts::*;
@@ -106,7 +107,17 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     let backend = EmbeddedBackend::new(&mut display, config);
     let mut terminal = Terminal::new(backend).unwrap();
 
+    app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connecting));
+    app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));
+
     let (_wifi, mut mqtt_client) = init_networking(modem, &app_config);
+
+    app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connected));
+    if mqtt_client.is_some() {
+        app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connected));
+    } else {
+        app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Disabled));
+    }
 
     let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
 
@@ -154,11 +165,13 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
         }
 
         while let Ok(telemetry) = rx.try_recv() {
-            if let Some(client) = mqtt_client.as_mut() {
-                publish_telemetry(client, &app_config, &telemetry);
-            }
             app.update_telemetry(telemetry);
         }
+
+        for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
+            publish_mqtt_message(&mut mqtt_client, &app_config, &topic_suffix, &payload);
+        }
+
         app.render_image(terminal.backend_mut().display_mut());
 
         terminal
@@ -238,28 +251,18 @@ fn init_networking(
     (Some(esp_wifi), Some(mqtt_client))
 }
 
-fn publish_telemetry(client: &mut EspMqttClient<'_>, cfg: &AppConfig, telemetry: &TelemetryFrame) {
-    let topic = cfg.telemetry_topic();
-    let payload = format!(
-        "{{\"mode\":\"{}\",\"sw\":\"{}\",\"boiler_now_c\":{},\"boiler_target_c\":{},\"hx_now_c\":{},\"boost_countdown_s\":{},\"heating_on\":{},\"pump_on\":{},\"no_water_code\":{}}}",
-        telemetry.mode,
-        telemetry.sw_version,
-        telemetry.boiler_now_c,
-        telemetry
-            .boiler_target_c
-            .map(|v| v.to_string())
-            .unwrap_or_else(|| "null".to_string()),
-        telemetry.hx_now_c,
-        telemetry.boost_countdown_s,
-        telemetry.heating_on,
-        telemetry.pump_on,
-        telemetry
-            .no_water_code
-            .map(|v| v.to_string())
-            .unwrap_or_else(|| "null".to_string())
-    );
+fn publish_mqtt_message(
+    client: &mut Option<EspMqttClient<'_>>,
+    cfg: &AppConfig,
+    topic_suffix: &str,
+    payload: &str,
+) {
+    let Some(client) = client.as_mut() else {
+        return;
+    };
 
+    let topic = format!("{}/{}", cfg.mqtt.topic_prefix, topic_suffix);
     if let Err(e) = client.publish(&topic, QoS::AtMostOnce, false, payload.as_bytes()) {
-        warn!("Failed to publish MQTT telemetry: {:?}", e);
+        warn!("Failed to publish MQTT message: {:?}", e);
     }
 }

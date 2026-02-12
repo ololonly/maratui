@@ -1,6 +1,7 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
 use crate::config::AppConfig;
+use crate::state::{AppEvent, ConnectionStatus};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::Size;
 use mousefood::fonts::*;
@@ -22,6 +23,9 @@ pub fn run_app(app: impl MaraUiApp) {
 
 fn run_app_simulator(mut app: impl MaraUiApp) {
     let app_config = AppConfig::from_env().expect("Invalid MARATUI_* configuration");
+
+    app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Disabled));
+    app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));
 
     let output_settings = OutputSettingsBuilder::new().scale(2).build();
     let simulator_window = Rc::new(RefCell::new(Window::new(
@@ -48,6 +52,11 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
     let mut terminal = Terminal::new(backend).unwrap();
 
     let mut mqtt = init_simulator_mqtt(&app_config);
+    if mqtt.is_some() {
+        app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connected));
+    } else {
+        app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Disabled));
+    }
 
     loop {
         app.render_image(terminal.backend_mut().display_mut());
@@ -77,18 +86,21 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                         }
                         Keycode::Up => {
                             let frame = TelemetryFrame::debug_pump_on_frame();
-                            publish_telemetry(&mut mqtt, &app_config, &frame);
                             app.update_telemetry(frame);
                         }
                         Keycode::Down => {
                             let frame = TelemetryFrame::debug_frame();
-                            publish_telemetry(&mut mqtt, &app_config, &frame);
                             app.update_telemetry(frame);
                         }
                         Keycode::Space => {
                             let frame = TelemetryFrame::debug_no_water_frame();
-                            publish_telemetry(&mut mqtt, &app_config, &frame);
                             app.update_telemetry(frame);
+                        }
+                        Keycode::M => {
+                            app.handle_event(AppEvent::PublishMqttEvent {
+                                topic_suffix: "events".to_string(),
+                                payload: "{\"type\":\"manual_sim_event\"}".to_string(),
+                            });
                         }
                         Keycode::D => {
                             terminal.clear().unwrap();
@@ -100,6 +112,10 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                 }
                 _ => {}
             }
+        }
+
+        for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
+            publish_mqtt_message(&mut mqtt, &app_config, &topic_suffix, &payload);
         }
     }
 }
@@ -137,29 +153,16 @@ fn parse_mqtt_host_port(url: &str) -> Option<(String, u16)> {
     Some((host_port.to_string(), 1883))
 }
 
-fn publish_telemetry(client: &mut Option<Client>, cfg: &AppConfig, telemetry: &TelemetryFrame) {
+fn publish_mqtt_message(
+    client: &mut Option<Client>,
+    cfg: &AppConfig,
+    topic_suffix: &str,
+    payload: &str,
+) {
     let Some(client) = client.as_mut() else {
         return;
     };
 
-    let payload = format!(
-        "{{\"mode\":\"{}\",\"sw\":\"{}\",\"boiler_now_c\":{},\"boiler_target_c\":{},\"hx_now_c\":{},\"boost_countdown_s\":{},\"heating_on\":{},\"pump_on\":{},\"no_water_code\":{}}}",
-        telemetry.mode,
-        telemetry.sw_version,
-        telemetry.boiler_now_c,
-        telemetry
-            .boiler_target_c
-            .map(|v| v.to_string())
-            .unwrap_or_else(|| "null".to_string()),
-        telemetry.hx_now_c,
-        telemetry.boost_countdown_s,
-        telemetry.heating_on,
-        telemetry.pump_on,
-        telemetry
-            .no_water_code
-            .map(|v| v.to_string())
-            .unwrap_or_else(|| "null".to_string())
-    );
-
-    let _ = client.publish(cfg.telemetry_topic(), QoS::AtMostOnce, false, payload);
+    let topic = format!("{}/{}", cfg.mqtt.topic_prefix, topic_suffix);
+    let _ = client.publish(topic, QoS::AtMostOnce, false, payload);
 }

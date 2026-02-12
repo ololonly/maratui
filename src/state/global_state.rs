@@ -5,6 +5,27 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ConnectionStatus {
+    Disabled,
+    Disconnected,
+    Connecting,
+    Connected,
+    Error(String),
+}
+
+impl Default for ConnectionStatus {
+    fn default() -> Self {
+        Self::Disconnected
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MqttOutboundMessage {
+    pub topic_suffix: String,
+    pub payload: String,
+}
+
 /// State of the coffee extraction process
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ExtractionState {
@@ -81,6 +102,9 @@ pub struct GlobalAppState {
     /// Machine state (mode, temperatures, pump, etc.)
     pub machine_state: MachineState,
     pub events_log: VecDeque<String>,
+    pub wifi_status: ConnectionStatus,
+    pub mqtt_status: ConnectionStatus,
+    pub outbound_mqtt: VecDeque<MqttOutboundMessage>,
     /// Current error (if any)
     pub error: Option<AppError>,
 }
@@ -92,6 +116,9 @@ impl Default for GlobalAppState {
             extraction_state: ExtractionState::default(),
             machine_state: MachineState::default(),
             events_log: VecDeque::with_capacity(10),
+            wifi_status: ConnectionStatus::default(),
+            mqtt_status: ConnectionStatus::default(),
+            outbound_mqtt: VecDeque::with_capacity(32),
             error: None,
         }
     }
@@ -124,6 +151,25 @@ impl GlobalAppState {
     /// Clear the error
     pub fn clear_error(&mut self) {
         self.error = None;
+    }
+
+    pub fn enqueue_mqtt_message(
+        &mut self,
+        topic_suffix: impl Into<String>,
+        payload: impl Into<String>,
+    ) {
+        self.outbound_mqtt.push_back(MqttOutboundMessage {
+            topic_suffix: topic_suffix.into(),
+            payload: payload.into(),
+        });
+
+        while self.outbound_mqtt.len() > 64 {
+            self.outbound_mqtt.pop_front();
+        }
+    }
+
+    pub fn take_outbound_mqtt_messages(&mut self) -> Vec<MqttOutboundMessage> {
+        self.outbound_mqtt.drain(..).collect()
     }
 }
 

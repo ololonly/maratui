@@ -1,5 +1,7 @@
 use crate::telemetry::AppEvent as TelemetryEvent;
 
+use super::ConnectionStatus;
+
 /// Application events
 /// Combines telemetry events and UI events
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,6 +40,18 @@ pub enum AppEvent {
 
     /// Error cleared
     ErrorCleared,
+
+    /// Wi-Fi status changed
+    WifiStatusChanged(ConnectionStatus),
+
+    /// MQTT status changed
+    MqttStatusChanged(ConnectionStatus),
+
+    /// Request publish custom app event to MQTT
+    PublishMqttEvent {
+        topic_suffix: String,
+        payload: String,
+    },
 }
 
 impl AppEvent {
@@ -61,6 +75,9 @@ impl AppEvent {
                 | AppEvent::ModeChanged { .. }
                 | AppEvent::WaterRefillNeeded { .. }
                 | AppEvent::WaterRefillCleared
+                | AppEvent::WifiStatusChanged(..)
+                | AppEvent::MqttStatusChanged(..)
+                | AppEvent::PublishMqttEvent { .. }
         )
     }
 
@@ -96,6 +113,16 @@ impl std::fmt::Display for AppEvent {
             AppEvent::DebugScreen => write!(f, "Debug Screen"),
             AppEvent::ErrorOccurred { error } => write!(f, "Error: {}", error),
             AppEvent::ErrorCleared => write!(f, "Error Cleared"),
+            AppEvent::WifiStatusChanged(status) => write!(f, "Wi-Fi status: {:?}", status),
+            AppEvent::MqttStatusChanged(status) => write!(f, "MQTT status: {:?}", status),
+            AppEvent::PublishMqttEvent {
+                topic_suffix,
+                payload,
+            } => write!(
+                f,
+                "Publish MQTT event: suffix='{}' payload='{}'",
+                topic_suffix, payload
+            ),
         }
     }
 }
