@@ -11,7 +11,7 @@ pub enum AppEvent {
     ShotStarted,
 
     /// Pump turned off, extraction ended
-    ShotEnded,
+    ShotEnded { duration: u64 },
 
     /// Machine mode changed
     ModeChanged {
@@ -59,7 +59,7 @@ impl AppEvent {
     pub fn from_telemetry(event: TelemetryEvent) -> Self {
         match event {
             TelemetryEvent::ShotStarted => AppEvent::ShotStarted,
-            TelemetryEvent::ShotEnded => AppEvent::ShotEnded,
+            TelemetryEvent::ShotEnded { duration } => AppEvent::ShotEnded { duration },
             TelemetryEvent::ModeChanged { from, to } => AppEvent::ModeChanged { from, to },
             TelemetryEvent::WaterRefillNeeded { code } => AppEvent::WaterRefillNeeded { code },
             TelemetryEvent::WaterRefillCleared => AppEvent::WaterRefillCleared,
@@ -98,8 +98,8 @@ impl std::fmt::Display for AppEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AppEvent::ShotStarted => write!(f, "Shot Started"),
-            AppEvent::ShotEnded => {
-                write!(f, "Shot Ended")
+            AppEvent::ShotEnded { duration } => {
+                write!(f, "Shot Ended ({} ms)", duration)
             }
             AppEvent::ModeChanged { from, to } => {
                 write!(f, "Mode Changed: {} → {}", from, to)

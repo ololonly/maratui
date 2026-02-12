@@ -3,7 +3,7 @@ use log::info;
 use super::{AppError, AppEvent, ExtractionState, GlobalAppState};
 use crate::button::{Button, ButtonPressType};
 use crate::telemetry::{TelemetryFrame, update_state_with_events};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Application state machine
 /// Handles events and updates the global application state
@@ -30,9 +30,9 @@ impl AppStateMachine {
                 state.error = None;
             }
 
-            AppEvent::ShotEnded => {
+            AppEvent::ShotEnded { duration } => {
                 state.extraction_state = ExtractionState::Idle {
-                    last_extraction_duration: state.extraction_state.elapsed(),
+                    last_extraction_duration: Some(Duration::from_secs(duration)),
                 };
             }
 
@@ -229,7 +229,9 @@ fn telemetry_payload(frame: &TelemetryFrame) -> String {
 fn telemetry_event_payload(event: &crate::telemetry::AppEvent) -> String {
     match event {
         crate::telemetry::AppEvent::ShotStarted => "{\"type\":\"shot_started\"}".to_string(),
-        crate::telemetry::AppEvent::ShotEnded => "{\"type\":\"shot_ended\"}".to_string(),
+        crate::telemetry::AppEvent::ShotEnded { duration } => {
+            format!("{{\"type\":\"shot_ended\",\"duration\":{}}}", duration)
+        }
         crate::telemetry::AppEvent::WaterRefillNeeded { code } => {
             format!("{{\"type\":\"water_refill_needed\",\"code\":{}}}", code)
         }
@@ -274,7 +276,12 @@ mod tests {
         };
 
         let duration = Duration::from_secs(30);
-        AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded);
+        AppStateMachine::handle_event(
+            &mut state,
+            AppEvent::ShotEnded {
+                duration: duration.as_secs() as u64,
+            },
+        );
 
         assert_eq!(
             state.extraction_state,
@@ -372,7 +379,12 @@ mod tests {
 
         // End extraction with 30 second duration
         let duration = Duration::from_secs(30);
-        AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded);
+        AppStateMachine::handle_event(
+            &mut state,
+            AppEvent::ShotEnded {
+                duration: duration.as_secs() as u64,
+            },
+        );
 
         // Verify duration is stored
         assert!(!state.extraction_state.is_extracting());
