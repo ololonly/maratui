@@ -59,7 +59,7 @@ impl Board for Graphs {
         ];
 
         let chart = Chart::new(datasets)
-            .block(Block::bordered().title(Line::from("Line chart").cyan().bold().centered()))
+            .block(Block::bordered().title(Line::from("Temperatures").cyan().bold().centered()))
             .x_axis(
                 Axis::default()
                     .style(Style::default().gray())
@@ -68,7 +68,6 @@ impl Board for Graphs {
             )
             .y_axis(
                 Axis::default()
-                    .title("Temp")
                     .style(Style::default().gray())
                     .labels(["30°", "90°", "150°"])
                     .bounds([30.0, 150.0]),
