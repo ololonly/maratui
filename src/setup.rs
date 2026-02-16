@@ -15,11 +15,18 @@ use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio27, Gpio33, InterruptType, Output, PinDriver};
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::spi::{SPI2, SpiConfig, SpiDeviceDriver, SpiDriver};
+use esp_idf_svc::ipv4::{
+    ClientConfiguration as IpClientConfiguration, Configuration as IpConfiguration,
+    DHCPClientSettings,
+};
 use esp_idf_svc::mqtt::client::{
     EspMqttClient, EventPayload, MqttClientConfiguration, MqttProtocolVersion, QoS,
 };
+use esp_idf_svc::netif::{EspNetif, NetifConfiguration, NetifStack};
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
-use esp_idf_svc::wifi::{AuthMethod, BlockingWifi, ClientConfiguration, Configuration, EspWifi};
+use esp_idf_svc::wifi::{
+    AuthMethod, BlockingWifi, ClientConfiguration, Configuration, EspWifi, WifiDriver,
+};
 use ili9341::{DisplaySize240x320, Ili9341, Orientation};
 use log::{info, warn};
 use std::sync::mpsc::{self, Receiver};
@@ -207,7 +214,22 @@ fn init_networking(
         .as_ref()
         .expect("Wi-Fi config is required on device");
 
-    let mut esp_wifi = EspWifi::new(modem, sys_loop.clone(), nvs).expect("Failed to create Wi-Fi");
+    let wifi_driver =
+        WifiDriver::new(modem, sys_loop.clone(), nvs).expect("Failed to create Wi-Fi driver");
+    let mut esp_wifi = EspWifi::wrap_all(
+        wifi_driver,
+        EspNetif::new_with_conf(&NetifConfiguration {
+            ip_configuration: Some(IpConfiguration::Client(IpClientConfiguration::DHCP(
+                DHCPClientSettings {
+                    hostname: Some("maratui".try_into().expect("hostname too long")),
+                },
+            ))),
+            ..NetifConfiguration::wifi_default_client()
+        })
+        .expect("Failed to create STA netif"),
+        EspNetif::new(NetifStack::Ap).expect("Failed to create AP netif"),
+    )
+    .expect("Failed to create Wi-Fi");
     {
         let mut wifi =
             BlockingWifi::wrap(&mut esp_wifi, sys_loop.clone()).expect("Failed to wrap Wi-Fi");
@@ -245,7 +267,9 @@ fn init_networking(
     let cup_counter_topic = format!("{}/cup_counter", app_config.mqtt.topic_prefix);
     let callback_topic = cup_counter_topic.clone();
     let (cup_counter_tx, cup_counter_rx) = mpsc::channel::<u64>();
+    let (connected_tx, connected_rx) = mpsc::sync_channel::<()>(1);
 
+    info!("Starting MQTT client: {}", app_config.mqtt.url);
     let mut mqtt_client = EspMqttClient::new_cb(
         &app_config.mqtt.url,
         &MqttClientConfiguration {
@@ -259,6 +283,10 @@ fn init_networking(
             ..Default::default()
         },
         move |event| match event.payload() {
+            EventPayload::Connected(_) => {
+                info!("MQTT connected");
+                let _ = connected_tx.try_send(());
+            }
             EventPayload::Received {
                 topic: Some(topic),
                 data,
@@ -284,8 +312,15 @@ fn init_networking(
     )
     .expect("Failed to create MQTT client");
 
-    if let Err(e) = mqtt_client.subscribe(&cup_counter_topic, QoS::AtMostOnce) {
-        warn!("Failed to subscribe to {}: {:?}", cup_counter_topic, e);
+    match connected_rx.recv_timeout(Duration::from_secs(10)) {
+        Ok(_) => {
+            if let Err(e) = mqtt_client.subscribe(&cup_counter_topic, QoS::AtMostOnce) {
+                warn!("Failed to subscribe to {}: {:?}", cup_counter_topic, e);
+            }
+        }
+        Err(_) => {
+            warn!("MQTT connection timeout after 10s, skipping subscribe");
+        }
     }
 
     info!("MQTT started: {}", app_config.mqtt.url);
