@@ -3,7 +3,7 @@ use log::info;
 use super::{AppError, AppEvent, ExtractionState, GlobalAppState};
 use crate::button::{Button, ButtonPressType};
 use crate::telemetry::{TelemetryFrame, update_state_with_events};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Application state machine
 /// Handles events and updates the global application state
@@ -30,9 +30,9 @@ impl AppStateMachine {
                 state.error = None;
             }
 
-            AppEvent::ShotEnded => {
+            AppEvent::ShotEnded { duration } => {
                 state.extraction_state = ExtractionState::Idle {
-                    last_extraction_duration: state.extraction_state.elapsed(),
+                    last_extraction_duration: Some(Duration::from_secs(duration)),
                 };
             }
 
@@ -71,6 +71,25 @@ impl AppStateMachine {
             AppEvent::ErrorCleared => {
                 state.error = None;
             }
+
+            AppEvent::WifiStatusChanged(status) => {
+                state.wifi_status = status;
+            }
+
+            AppEvent::MqttStatusChanged(status) => {
+                state.mqtt_status = status;
+            }
+
+            AppEvent::CupCounterUpdated { cups } => {
+                state.cup_counter = Some(cups);
+            }
+
+            AppEvent::PublishMqttEvent {
+                topic_suffix,
+                payload,
+            } => {
+                state.enqueue_mqtt_message(topic_suffix, payload);
+            }
         }
     }
 
@@ -98,6 +117,8 @@ impl AppStateMachine {
 
     /// Handle telemetry frame updates
     pub fn handle_telemetry_frame(state: &mut GlobalAppState, frame: TelemetryFrame, now: Instant) {
+        state.enqueue_mqtt_message("telemetry", telemetry_payload(&frame));
+
         // Update MachineState and get derived events
         let (_snapshot, events) =
             update_state_with_events(&mut state.machine_state, frame.clone(), now);
@@ -173,8 +194,10 @@ impl AppStateMachine {
 
         // Process each event through the FSM
         for event in events {
-            let app_event = AppEvent::from_telemetry(event);
+            let app_event = AppEvent::from_telemetry(event.clone());
             Self::handle_event(state, app_event);
+            let event_payload = telemetry_event_payload(&event);
+            state.enqueue_mqtt_message("events", event_payload);
         }
     }
 
@@ -182,6 +205,48 @@ impl AppStateMachine {
     pub fn handle_events(state: &mut GlobalAppState, events: Vec<AppEvent>) {
         for event in events {
             Self::handle_event(state, event);
+        }
+    }
+}
+
+fn telemetry_payload(frame: &TelemetryFrame) -> String {
+    format!(
+        "{{\"mode\":\"{}\",\"sw\":\"{}\",\"boiler_now_c\":{},\"boiler_target_c\":{},\"hx_now_c\":{},\"boost_countdown_s\":{},\"heating_on\":{},\"pump_on\":{},\"no_water_code\":{}}}",
+        frame.mode,
+        frame.sw_version,
+        frame.boiler_now_c,
+        frame
+            .boiler_target_c
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "null".to_string()),
+        frame.hx_now_c,
+        frame.boost_countdown_s,
+        frame.heating_on,
+        frame.pump_on,
+        frame
+            .no_water_code
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "null".to_string())
+    )
+}
+
+fn telemetry_event_payload(event: &crate::telemetry::AppEvent) -> String {
+    match event {
+        crate::telemetry::AppEvent::ShotStarted => "{\"type\":\"shot_started\"}".to_string(),
+        crate::telemetry::AppEvent::ShotEnded { duration } => {
+            format!("{{\"type\":\"shot_ended\",\"duration\":{}}}", duration)
+        }
+        crate::telemetry::AppEvent::WaterRefillNeeded { code } => {
+            format!("{{\"type\":\"water_refill_needed\",\"code\":{}}}", code)
+        }
+        crate::telemetry::AppEvent::WaterRefillCleared => {
+            "{\"type\":\"water_refill_cleared\"}".to_string()
+        }
+        crate::telemetry::AppEvent::ModeChanged { from, to } => {
+            format!(
+                "{{\"type\":\"mode_changed\",\"from\":\"{}\",\"to\":\"{}\"}}",
+                from, to
+            )
         }
     }
 }
@@ -215,7 +280,12 @@ mod tests {
         };
 
         let duration = Duration::from_secs(30);
-        AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded);
+        AppStateMachine::handle_event(
+            &mut state,
+            AppEvent::ShotEnded {
+                duration: duration.as_secs() as u64,
+            },
+        );
 
         assert_eq!(
             state.extraction_state,
@@ -313,7 +383,12 @@ mod tests {
 
         // End extraction with 30 second duration
         let duration = Duration::from_secs(30);
-        AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded);
+        AppStateMachine::handle_event(
+            &mut state,
+            AppEvent::ShotEnded {
+                duration: duration.as_secs() as u64,
+            },
+        );
 
         // Verify duration is stored
         assert!(!state.extraction_state.is_extracting());
@@ -327,5 +402,15 @@ mod tests {
         assert!(state.extraction_state.is_extracting());
         // Previous duration should be cleared when new extraction starts
         assert_eq!(state.extraction_state.last_extraction_duration(), None);
+    }
+
+    #[test]
+    fn test_handle_cup_counter_updated() {
+        let mut state = GlobalAppState::default();
+        assert_eq!(state.cup_counter, None);
+
+        AppStateMachine::handle_event(&mut state, AppEvent::CupCounterUpdated { cups: 42 });
+
+        assert_eq!(state.cup_counter, Some(42));
     }
 }

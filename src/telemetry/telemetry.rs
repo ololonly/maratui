@@ -194,7 +194,7 @@ pub enum AppEvent {
     ShotStarted,
 
     /// Pump transitioned from ON -> OFF, with total ON duration.
-    ShotEnded,
+    ShotEnded { duration: u64 },
 
     /// No-water condition appeared (None -> Some(code)) or code changed.
     WaterRefillNeeded { code: u16 },
@@ -212,6 +212,7 @@ pub struct MachineState {
     pub on: bool,
     pub last_frame: Option<TelemetryFrame>,
     pub last_update: Option<Instant>,
+    pub shot_started_at: Option<Instant>,
     pub target_boiler_data: VecDeque<f64>,
     pub current_boiler_data: VecDeque<f64>,
     pub current_hx_data: VecDeque<f64>,
@@ -223,6 +224,7 @@ impl Default for MachineState {
             on: false,
             last_frame: None,
             last_update: None,
+            shot_started_at: None,
             target_boiler_data: VecDeque::with_capacity(300),
             current_boiler_data: VecDeque::with_capacity(300),
             current_hx_data: VecDeque::with_capacity(300),
@@ -266,6 +268,7 @@ pub fn update_state_with_events(
     match (prev_pump_on, frame.pump_on) {
         (false, true) => {
             // Shot started
+            state.shot_started_at = Some(now);
             events.push(AppEvent::ShotStarted);
         }
         (true, true) => {
@@ -273,7 +276,12 @@ pub fn update_state_with_events(
         }
         (true, false) => {
             // Shot ended
-            events.push(AppEvent::ShotEnded);
+            let duration = state
+                .shot_started_at
+                .map(|started_at| now.saturating_duration_since(started_at).as_secs() as u64)
+                .unwrap_or(0);
+            state.shot_started_at = None;
+            events.push(AppEvent::ShotEnded { duration });
         }
         (false, false) => {
             // No shot
@@ -352,7 +360,7 @@ mod tests {
 
         let off2 = parse_uart_line("C1.10,039,138,035,0000,1,0").unwrap();
         let (_s3, e3) = update_state_with_events(&mut st, off2, t0 + Duration::from_secs(3));
-        assert_eq!(e3.len(), 1);
+        assert_eq!(e3, vec![AppEvent::ShotEnded { duration: 2_800 }]);
     }
 
     #[test]

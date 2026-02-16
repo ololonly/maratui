@@ -1,7 +1,7 @@
 use crate::button::Button;
 use crate::run_app;
 use crate::screens::{Board, Dashboard, Debug, Graphs, Rat, Screen};
-use crate::state::{AppError, AppStateMachine, GlobalAppState};
+use crate::state::{AppError, AppEvent, AppStateMachine, ConnectionStatus, GlobalAppState};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::Drawable;
 use mousefood::embedded_graphics::image::{Image, ImageRaw, ImageRawBE};
@@ -20,6 +20,15 @@ pub trait MaraUiApp {
 
     /// Update application state with telemetry data
     fn update_telemetry(&mut self, telemetry: TelemetryFrame);
+
+    /// Handle generic application event
+    fn handle_event(&mut self, event: AppEvent);
+
+    /// Drain app-generated MQTT outbound messages (`topic_suffix`, `payload`)
+    fn take_outbound_mqtt_messages(&mut self) -> Vec<(String, String)>;
+
+    /// Read current network status from app state
+    fn connection_statuses(&self) -> (ConnectionStatus, ConnectionStatus);
 
     fn render_image<D>(&mut self, display: &mut D)
     where
@@ -67,6 +76,25 @@ impl MaraUiApp for MaraUi {
     fn update_telemetry(&mut self, telemetry: TelemetryFrame) {
         let now = Instant::now();
         AppStateMachine::handle_telemetry_frame(&mut self.state, telemetry, now);
+    }
+
+    fn handle_event(&mut self, event: AppEvent) {
+        AppStateMachine::handle_event(&mut self.state, event);
+    }
+
+    fn take_outbound_mqtt_messages(&mut self) -> Vec<(String, String)> {
+        self.state
+            .take_outbound_mqtt_messages()
+            .into_iter()
+            .map(|msg| (msg.topic_suffix, msg.payload))
+            .collect()
+    }
+
+    fn connection_statuses(&self) -> (ConnectionStatus, ConnectionStatus) {
+        (
+            self.state.wifi_status.clone(),
+            self.state.mqtt_status.clone(),
+        )
     }
 
     fn render_image<D>(&mut self, display: &mut D)

@@ -1,13 +1,18 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
+use crate::config::AppConfig;
+use crate::state::{AppEvent, ConnectionStatus};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::Size;
 use mousefood::fonts::*;
 use mousefood::prelude::*;
 use ratatui::Terminal;
+use rumqttc::{Client, Event, MqttOptions, Packet, QoS};
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::mpsc::{self, Receiver};
+use std::time::Duration;
 
 use embedded_graphics_simulator::{
     OutputSettingsBuilder, SimulatorDisplay, SimulatorEvent, Window, sdl2::Keycode,
@@ -18,6 +23,11 @@ pub fn run_app(app: impl MaraUiApp) {
 }
 
 fn run_app_simulator(mut app: impl MaraUiApp) {
+    let app_config = AppConfig::from_env().expect("Invalid MARATUI_* configuration");
+
+    app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Disabled));
+    app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));
+
     let output_settings = OutputSettingsBuilder::new().scale(2).build();
     let simulator_window = Rc::new(RefCell::new(Window::new(
         "Maratui Simulator",
@@ -41,6 +51,13 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
 
     let backend = EmbeddedBackend::new(&mut display, config);
     let mut terminal = Terminal::new(backend).unwrap();
+
+    let (mut mqtt, mut cup_counter_rx) = init_simulator_mqtt(&app_config);
+    if mqtt.is_some() {
+        app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connected));
+    } else {
+        app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Disabled));
+    }
 
     loop {
         app.render_image(terminal.backend_mut().display_mut());
@@ -69,13 +86,22 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                             app.handle_press(Button::Button1(ButtonPressType::Short));
                         }
                         Keycode::Up => {
-                            app.update_telemetry(TelemetryFrame::debug_pump_on_frame());
+                            let frame = TelemetryFrame::debug_pump_on_frame();
+                            app.update_telemetry(frame);
                         }
                         Keycode::Down => {
-                            app.update_telemetry(TelemetryFrame::debug_frame());
+                            let frame = TelemetryFrame::debug_frame();
+                            app.update_telemetry(frame);
                         }
                         Keycode::Space => {
-                            app.update_telemetry(TelemetryFrame::debug_no_water_frame());
+                            let frame = TelemetryFrame::debug_no_water_frame();
+                            app.update_telemetry(frame);
+                        }
+                        Keycode::M => {
+                            app.handle_event(AppEvent::PublishMqttEvent {
+                                topic_suffix: "events".to_string(),
+                                payload: "{\"type\":\"manual_sim_event\"}".to_string(),
+                            });
                         }
                         Keycode::D => {
                             terminal.clear().unwrap();
@@ -88,5 +114,85 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                 _ => {}
             }
         }
+
+        for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
+            publish_mqtt_message(&mut mqtt, &app_config, &topic_suffix, &payload);
+        }
+
+        if let Some(cup_counter_rx) = cup_counter_rx.as_mut() {
+            while let Ok(cups) = cup_counter_rx.try_recv() {
+                app.handle_event(AppEvent::CupCounterUpdated { cups });
+            }
+        }
     }
+}
+
+fn init_simulator_mqtt(cfg: &AppConfig) -> (Option<Client>, Option<Receiver<u64>>) {
+    if !cfg.mqtt.enabled {
+        return (None, None);
+    }
+
+    let Some((host, port)) = parse_mqtt_host_port(&cfg.mqtt.url) else {
+        return (None, None);
+    };
+    let mut options = MqttOptions::new(cfg.mqtt.client_id.clone(), host, port);
+    options.set_keep_alive(Duration::from_secs(30));
+
+    if let Some(username) = cfg.mqtt.username.as_ref() {
+        options.set_credentials(username, cfg.mqtt.password.as_deref().unwrap_or_default());
+    }
+
+    let (client, mut connection) = Client::new(options, 10);
+    let cup_counter_topic = format!("{}/cup_counter", cfg.mqtt.topic_prefix);
+    let (cup_counter_tx, cup_counter_rx) = mpsc::channel::<u64>();
+
+    let _ = client.subscribe(&cup_counter_topic, QoS::AtMostOnce);
+
+    std::thread::spawn(move || {
+        for notification in connection.iter() {
+            let Ok(Event::Incoming(Packet::Publish(publish))) = notification else {
+                continue;
+            };
+
+            if publish.topic != cup_counter_topic {
+                continue;
+            }
+
+            if let Ok(payload) = core::str::from_utf8(&publish.payload)
+                && let Ok(cups) = payload.trim().parse::<u64>()
+            {
+                let _ = cup_counter_tx.send(cups);
+            }
+        }
+    });
+    (Some(client), Some(cup_counter_rx))
+}
+
+fn parse_mqtt_host_port(url: &str) -> Option<(String, u16)> {
+    let without_proto = url
+        .strip_prefix("mqtt://")
+        .or_else(|| url.strip_prefix("tcp://"))
+        .or_else(|| url.strip_prefix("ws://"))
+        .unwrap_or(url);
+
+    let host_port = without_proto.split('/').next()?;
+    if let Some((host, port)) = host_port.rsplit_once(':') {
+        return Some((host.to_string(), port.parse().ok()?));
+    }
+
+    Some((host_port.to_string(), 1883))
+}
+
+fn publish_mqtt_message(
+    client: &mut Option<Client>,
+    cfg: &AppConfig,
+    topic_suffix: &str,
+    payload: &str,
+) {
+    let Some(client) = client.as_mut() else {
+        return;
+    };
+
+    let topic = format!("{}/{}", cfg.mqtt.topic_prefix, topic_suffix);
+    let _ = client.publish(topic, QoS::AtMostOnce, false, payload);
 }

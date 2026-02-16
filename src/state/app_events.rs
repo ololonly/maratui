@@ -1,5 +1,7 @@
 use crate::telemetry::AppEvent as TelemetryEvent;
 
+use super::ConnectionStatus;
+
 /// Application events
 /// Combines telemetry events and UI events
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -9,7 +11,7 @@ pub enum AppEvent {
     ShotStarted,
 
     /// Pump turned off, extraction ended
-    ShotEnded,
+    ShotEnded { duration: u64 },
 
     /// Machine mode changed
     ModeChanged {
@@ -38,6 +40,21 @@ pub enum AppEvent {
 
     /// Error cleared
     ErrorCleared,
+
+    /// Wi-Fi status changed
+    WifiStatusChanged(ConnectionStatus),
+
+    /// MQTT status changed
+    MqttStatusChanged(ConnectionStatus),
+
+    /// Cup counter value updated from MQTT retained/incoming message
+    CupCounterUpdated { cups: u64 },
+
+    /// Request publish custom app event to MQTT
+    PublishMqttEvent {
+        topic_suffix: String,
+        payload: String,
+    },
 }
 
 impl AppEvent {
@@ -45,7 +62,7 @@ impl AppEvent {
     pub fn from_telemetry(event: TelemetryEvent) -> Self {
         match event {
             TelemetryEvent::ShotStarted => AppEvent::ShotStarted,
-            TelemetryEvent::ShotEnded => AppEvent::ShotEnded,
+            TelemetryEvent::ShotEnded { duration } => AppEvent::ShotEnded { duration },
             TelemetryEvent::ModeChanged { from, to } => AppEvent::ModeChanged { from, to },
             TelemetryEvent::WaterRefillNeeded { code } => AppEvent::WaterRefillNeeded { code },
             TelemetryEvent::WaterRefillCleared => AppEvent::WaterRefillCleared,
@@ -61,6 +78,10 @@ impl AppEvent {
                 | AppEvent::ModeChanged { .. }
                 | AppEvent::WaterRefillNeeded { .. }
                 | AppEvent::WaterRefillCleared
+                | AppEvent::WifiStatusChanged(..)
+                | AppEvent::MqttStatusChanged(..)
+                | AppEvent::CupCounterUpdated { .. }
+                | AppEvent::PublishMqttEvent { .. }
         )
     }
 
@@ -81,8 +102,8 @@ impl std::fmt::Display for AppEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AppEvent::ShotStarted => write!(f, "Shot Started"),
-            AppEvent::ShotEnded => {
-                write!(f, "Shot Ended")
+            AppEvent::ShotEnded { duration } => {
+                write!(f, "Shot Ended ({} ms)", duration)
             }
             AppEvent::ModeChanged { from, to } => {
                 write!(f, "Mode Changed: {} → {}", from, to)
@@ -96,6 +117,17 @@ impl std::fmt::Display for AppEvent {
             AppEvent::DebugScreen => write!(f, "Debug Screen"),
             AppEvent::ErrorOccurred { error } => write!(f, "Error: {}", error),
             AppEvent::ErrorCleared => write!(f, "Error Cleared"),
+            AppEvent::WifiStatusChanged(status) => write!(f, "Wi-Fi status: {:?}", status),
+            AppEvent::MqttStatusChanged(status) => write!(f, "MQTT status: {:?}", status),
+            AppEvent::CupCounterUpdated { cups } => write!(f, "Cup counter updated: {}", cups),
+            AppEvent::PublishMqttEvent {
+                topic_suffix,
+                payload,
+            } => write!(
+                f,
+                "Publish MQTT event: suffix='{}' payload='{}'",
+                topic_suffix, payload
+            ),
         }
     }
 }

@@ -8,7 +8,7 @@ default = ["device"]
 # Build for ESP. cargo build / cargo build --release
 device = ["dep:esp-idf-svc", "dep:ili9341", "dep:display-interface-spi", "dep:embuild"]
 # Build UI on host. cargo sim --target <host>
-simulator = ["dep:embedded-graphics-simulator"]
+simulator = ["dep:embedded-graphics-simulator", "dep:rumqttc"]
 
 [dependencies]
 anyhow = "1.0.100"
@@ -20,6 +20,7 @@ libc = "0.2"
 log = "0.4.29"
 mousefood = { version = "0.4.0", default-features=false, features = ["fonts"] }
 ratatui = {version = "0.30.0", default-features = false}
+rumqttc = { version = "0.24.0", optional = true }
 strum = "0.27.2"
 strum_macros = "0.27.2"
 tui-widgets = {version = "0.7.0", default-features=false, features=["big-text"]}
@@ -33,5 +34,4 @@ opt-level = 3
 [profile.dev]
 debug = true
 opt-level = 3
-
 
