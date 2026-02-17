@@ -3,7 +3,9 @@ use crate::button::{Button, ButtonState};
 use crate::config::AppConfig;
 use crate::state::{AppEvent, ConnectionStatus};
 use crate::telemetry::TelemetryFrame;
-use mousefood::embedded_graphics::prelude::{DrawTarget, RgbColor};
+use mousefood::embedded_graphics::Drawable;
+use mousefood::embedded_graphics::image::{Image, ImageRaw, ImageRawBE};
+use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor};
 use mousefood::fonts::*;
 use mousefood::prelude::*;
 use ratatui::Terminal;
@@ -96,8 +98,18 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     let button1_pin = peripherals.pins.gpio35;
     let button2_pin = peripherals.pins.gpio0;
 
+    //turn off backlight on idle
+    //turn on when button pressed w/ timeout
     let mut display =
         get_ili9341(spi_p, dc, mosi, sclk, cs, rst).expect("Failed to initialize display");
+
+    let loading_screen_data = include_bytes!("../assets/loading_screen.raw");
+    let loading_image_raw = ImageRawBE::new(loading_screen_data, 320);
+
+    let loading_image: Image<'_, ImageRaw<'_, Rgb565>> =
+        Image::new(&loading_image_raw, Point::zero());
+
+    loading_image.draw(&mut display).unwrap();
 
     let mut button1 = PinDriver::input(button1_pin).unwrap();
     button1.set_interrupt_type(InterruptType::NegEdge).unwrap();
@@ -151,6 +163,9 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             panic!("UART task spawn failed");
         }
     }
+
+    //Display cleanup before main loop
+    display.clear(Rgb565::BLACK).unwrap();
 
     Ets::delay_ms(100);
 

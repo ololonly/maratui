@@ -108,6 +108,9 @@ impl MaraUiApp for MaraUi {
 
         let image_data: &[u8];
 
+        //Example command to generate the image:
+        //ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png -filter_complex "[1:v]scale=180:180[scaled];[0:v][scaled]overlay" -f rawvideo -pix_fmt rgb565be -frames:v 1 rat_barista.raw
+        //ffmpeg -f lavfi -i color=black -i loading_screen.png -filter_complex "[1:v]scale=320:240[scaled];[0:v][scaled]overlay"  -f rawvideo -pix_fmt rgb565be -frames:v 1 loading_screen.raw
         if let Some(AppError::WaterRefillNeeded { .. }) = self.state.error {
             image_data = include_bytes!("../assets/rat_barista_thirsty.raw");
         } else {
@@ -116,7 +119,7 @@ impl MaraUiApp for MaraUi {
 
         let image = ImageRawBE::new(image_data, 180);
 
-        let im: Image<'_, ImageRaw<'_, Rgb565>> = Image::new(&image, Point::new(5, 60));
+        let im: Image<'_, ImageRaw<'_, Rgb565>> = Image::new(&image, Point::new(5, 0));
 
         im.draw(display).unwrap();
     }
