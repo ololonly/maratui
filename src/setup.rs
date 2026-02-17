@@ -165,7 +165,11 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     }
 
     //Display cleanup before main loop
-    display.clear(Rgb565::BLACK).unwrap();
+    terminal
+        .backend_mut()
+        .display_mut()
+        .clear(Rgb565::BLACK)
+        .unwrap();
 
     Ets::delay_ms(100);
 
