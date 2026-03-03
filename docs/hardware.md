@@ -2,6 +2,10 @@
 
 Target board: **ESP32 Type-C** (generic) with external **ILI9341** 240x320 TFT display.
 
+| ESP32 Type-C | ILI9341 Display |
+|:---:|:---:|
+| ![ESP32](assets/esp32.jpg) | ![ILI9341](assets/ili9341.jpg) |
+
 ## Pinout
 
 ### SPI Display (ILI9341)
