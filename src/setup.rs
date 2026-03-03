@@ -14,7 +14,7 @@ use crate::uart_reader::UartReader;
 use display_interface_spi::SPIInterface;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::delay::Ets;
-use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio27, Gpio33, InterruptType, Output, PinDriver};
+use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio27, Gpio33, InterruptType, Output, PinDriver, Pull};
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::spi::{SPI2, SpiConfig, SpiDeviceDriver, SpiDriver};
 use esp_idf_svc::ipv4::{
@@ -44,8 +44,8 @@ type DisplayResult<'a> = anyhow::Result<
 fn get_ili9341<'a>(
     spi_p: SPI2,
     dc: esp_idf_svc::hal::gpio::Gpio27,
-    mosi: esp_idf_svc::hal::gpio::Gpio13,
-    sclk: esp_idf_svc::hal::gpio::Gpio15,
+    mosi: esp_idf_svc::hal::gpio::Gpio23,
+    sclk: esp_idf_svc::hal::gpio::Gpio18,
     cs: Option<esp_idf_svc::hal::gpio::Gpio25>,
     rst: esp_idf_svc::hal::gpio::Gpio33,
 ) -> DisplayResult<'a> {
@@ -88,20 +88,23 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     let modem = peripherals.modem;
     let spi_p = peripherals.spi2;
     let dc = peripherals.pins.gpio27;
-    let mosi = peripherals.pins.gpio13;
-    let sclk = peripherals.pins.gpio15;
+    let mosi = peripherals.pins.gpio23;
+    let sclk = peripherals.pins.gpio18;
     let cs = Some(peripherals.pins.gpio25);
     let rst = peripherals.pins.gpio33;
     let uart1 = peripherals.uart1;
-    let gpio21 = peripherals.pins.gpio21;
-    let gpio22 = peripherals.pins.gpio22;
-    let button1_pin = peripherals.pins.gpio35;
-    let button2_pin = peripherals.pins.gpio0;
+    let uart_tx = peripherals.pins.gpio17;
+    let uart_rx = peripherals.pins.gpio16;
+    let button1_pin = peripherals.pins.gpio32;
+    let button2_pin = peripherals.pins.gpio19;
 
     //turn off backlight on idle
     //turn on when button pressed w/ timeout
     let mut display =
         get_ili9341(spi_p, dc, mosi, sclk, cs, rst).expect("Failed to initialize display");
+
+    let mut backlight = PinDriver::output(peripherals.pins.gpio14).unwrap();
+    backlight.set_high().unwrap();
 
     let loading_screen_data = include_bytes!("../assets/loading_screen.raw");
     let loading_image_raw = ImageRawBE::new(loading_screen_data, 320);
@@ -118,6 +121,9 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     let mut button2 = PinDriver::input(button2_pin).unwrap();
     button2.set_interrupt_type(InterruptType::NegEdge).unwrap();
     let mut button2_state = ButtonState::default();
+
+    button1.set_pull(Pull::Up).unwrap();
+    button2.set_pull(Pull::Up).unwrap();
 
     let config = EmbeddedBackendConfig {
         font_regular: MONO_7X14,
@@ -143,8 +149,8 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 
     let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
 
-    info!("Initializing UART1: TX=GPIO17, RX=GPIO22, baud=9600");
-    let uart_reader = match UartReader::new(uart1, gpio21, gpio22) {
+    info!("Initializing UART1: TX=GPIO17, RX=GPIO16, baud=9600");
+    let uart_reader = match UartReader::new(uart1, uart_tx, uart_rx) {
         Ok(reader) => {
             info!("UART1 initialized successfully");
             reader

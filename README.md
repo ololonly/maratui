@@ -74,6 +74,10 @@ Or use platform-specific cargo aliases directly:
 | macOS   | `cargo simmac` |
 | Windows | `cargo simwin` |
 
+### Hardware
+
+See [docs/hardware.md](docs/hardware.md) for ESP32 pinout, display wiring.
+
 ### ESP32 (flash)
 
 ```
