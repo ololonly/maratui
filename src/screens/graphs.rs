@@ -39,19 +39,19 @@ impl Board for Graphs {
 
         let datasets = vec![
             Dataset::default()
-                .name("Current temperature")
+                .name("Current")
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Yellow))
                 .graph_type(GraphType::Line)
                 .data(&curr_boiler_states),
             Dataset::default()
-                .name("Target temperature")
+                .name("Target")
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Red))
                 .graph_type(GraphType::Line)
                 .data(&target_boiler_states),
             Dataset::default()
-                .name("HX temperature")
+                .name("HX")
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Blue))
                 .graph_type(GraphType::Line)
