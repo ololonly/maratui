@@ -198,6 +198,8 @@ fn render_shot_gauge(state: &GlobalAppState, area: Rect, buf: &mut Buffer) {
         || state.extraction_state.last_extraction_duration().is_some();
 
     let block = Block::bordered()
+        .title_bottom("%")
+        .title_alignment(ratatui::layout::HorizontalAlignment::Center)
         .border_type(BorderType::Rounded)
         .border_style(Style::new().yellow());
     let inner = block.inner(area);
