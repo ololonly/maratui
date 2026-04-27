@@ -24,11 +24,22 @@ pub trait MaraUiApp {
     /// Handle generic application event
     fn handle_event(&mut self, event: AppEvent);
 
+    /// Process time-based transitions (auto-return after extraction)
+    fn tick(&mut self) {}
+
+    /// Returns `true` if the backlight should be on
+    fn backlight_active(&self) -> bool {
+        true
+    }
+
     /// Drain app-generated MQTT outbound messages (`topic_suffix`, `payload`)
     fn take_outbound_mqtt_messages(&mut self) -> Vec<(String, String)>;
 
     /// Read current network status from app state
     fn connection_statuses(&self) -> (ConnectionStatus, ConnectionStatus);
+
+    /// Current active screen
+    fn current_screen(&self) -> Screen;
 
     fn render_image<D>(&mut self, display: &mut D)
     where
@@ -88,6 +99,18 @@ impl MaraUiApp for MaraUi {
             .into_iter()
             .map(|msg| (msg.topic_suffix, msg.payload))
             .collect()
+    }
+
+    fn tick(&mut self) {
+        AppStateMachine::tick(&mut self.state, Instant::now());
+    }
+
+    fn backlight_active(&self) -> bool {
+        self.state.backlight_should_be_on(Instant::now())
+    }
+
+    fn current_screen(&self) -> Screen {
+        self.state.current_screen
     }
 
     fn connection_statuses(&self) -> (ConnectionStatus, ConnectionStatus) {

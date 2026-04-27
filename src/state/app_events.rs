@@ -103,7 +103,7 @@ impl std::fmt::Display for AppEvent {
         match self {
             AppEvent::ShotStarted => write!(f, "Shot Started"),
             AppEvent::ShotEnded { duration } => {
-                write!(f, "Shot Ended ({} ms)", duration)
+                write!(f, "Shot Ended ({} s)", duration)
             }
             AppEvent::ModeChanged { from, to } => {
                 write!(f, "Mode Changed: {} → {}", from, to)

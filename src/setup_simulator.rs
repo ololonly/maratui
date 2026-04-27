@@ -1,5 +1,6 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
+use crate::screens::Screen;
 use crate::config::AppConfig;
 use crate::state::{AppEvent, ConnectionStatus};
 use crate::telemetry::TelemetryFrame;
@@ -60,6 +61,12 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
     }
 
     loop {
+        let screen_before = app.current_screen();
+        app.tick();
+        if screen_before == Screen::Main && app.current_screen() != Screen::Main {
+            terminal.clear().unwrap();
+        }
+
         app.render_image(terminal.backend_mut().display_mut());
         terminal
             .draw(|f| {
@@ -86,16 +93,25 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                             app.handle_press(Button::Button1(ButtonPressType::Short));
                         }
                         Keycode::Up => {
-                            let frame = TelemetryFrame::debug_pump_on_frame();
-                            app.update_telemetry(frame);
+                            let prev = app.current_screen();
+                            app.update_telemetry(TelemetryFrame::debug_pump_on_frame());
+                            if prev == Screen::Main && app.current_screen() != Screen::Main {
+                                terminal.clear().unwrap();
+                            }
                         }
                         Keycode::Down => {
-                            let frame = TelemetryFrame::debug_frame();
-                            app.update_telemetry(frame);
+                            let prev = app.current_screen();
+                            app.update_telemetry(TelemetryFrame::debug_frame());
+                            if prev == Screen::Main && app.current_screen() != Screen::Main {
+                                terminal.clear().unwrap();
+                            }
                         }
                         Keycode::Space => {
-                            let frame = TelemetryFrame::debug_no_water_frame();
-                            app.update_telemetry(frame);
+                            let prev = app.current_screen();
+                            app.update_telemetry(TelemetryFrame::debug_no_water_frame());
+                            if prev == Screen::Main && app.current_screen() != Screen::Main {
+                                terminal.clear().unwrap();
+                            }
                         }
                         Keycode::M => {
                             app.handle_event(AppEvent::PublishMqttEvent {

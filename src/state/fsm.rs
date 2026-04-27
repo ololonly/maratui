@@ -1,7 +1,8 @@
 use log::info;
 
-use super::{AppError, AppEvent, ExtractionState, GlobalAppState};
+use super::{AppError, AppEvent, ExtractionState, GlobalAppState, global_state::EXTRACTION_RETURN_DELAY};
 use crate::button::{Button, ButtonPressType};
+use crate::screens::Screen;
 use crate::telemetry::{TelemetryFrame, update_state_with_events};
 use std::time::{Duration, Instant};
 
@@ -28,12 +29,23 @@ impl AppStateMachine {
                 };
                 // Clear error when extraction starts
                 state.error = None;
+                // Auto-switch to Dashboard and remember where to return
+                if state.current_screen != Screen::Dashboard {
+                    state.screen_before_extraction = Some(state.current_screen);
+                }
+                state.return_to_screen_at = None;
+                state.current_screen = Screen::Dashboard;
             }
 
             AppEvent::ShotEnded { duration } => {
                 state.extraction_state = ExtractionState::Idle {
                     last_extraction_duration: Some(Duration::from_secs(duration)),
                 };
+                // Schedule return to the previous screen after the cooldown
+                if state.screen_before_extraction.is_some() {
+                    state.return_to_screen_at =
+                        Some(Instant::now() + EXTRACTION_RETURN_DELAY);
+                }
             }
 
             AppEvent::ModeChanged { from: _, to: _ } => {
@@ -52,14 +64,20 @@ impl AppStateMachine {
             // ===== UI Events =====
             AppEvent::NextScreen => {
                 state.current_screen = state.current_screen.next();
+                state.screen_before_extraction = None;
+                state.return_to_screen_at = None;
             }
 
             AppEvent::PreviousScreen => {
                 state.current_screen = state.current_screen.previous();
+                state.screen_before_extraction = None;
+                state.return_to_screen_at = None;
             }
 
             AppEvent::DebugScreen => {
-                state.current_screen = crate::screens::Screen::Debug;
+                state.current_screen = Screen::Debug;
+                state.screen_before_extraction = None;
+                state.return_to_screen_at = None;
             }
 
             AppEvent::ErrorOccurred { error } => {
@@ -95,6 +113,7 @@ impl AppStateMachine {
 
     /// Handle button press events
     pub fn handle_button_press(state: &mut GlobalAppState, button: Button) {
+        state.last_activity_at = Some(Instant::now());
         match button {
             Button::Button1(ButtonPressType::Short) => {
                 // Handle short press of Button1
@@ -189,8 +208,9 @@ impl AppStateMachine {
             .current_hx_data
             .push_back(hx_now_c.into());
 
-        // Store the latest telemetry frame
+        // Store the latest telemetry frame and record activity time
         state.machine_state.last_frame = Some(frame);
+        state.last_activity_at = Some(now);
 
         // Process each event through the FSM
         for event in events {
@@ -205,6 +225,18 @@ impl AppStateMachine {
     pub fn handle_events(state: &mut GlobalAppState, events: Vec<AppEvent>) {
         for event in events {
             Self::handle_event(state, event);
+        }
+    }
+
+    /// Check time-based transitions (call once per main loop iteration)
+    pub fn tick(state: &mut GlobalAppState, now: Instant) {
+        if let Some(return_at) = state.return_to_screen_at {
+            if now >= return_at {
+                if let Some(screen) = state.screen_before_extraction.take() {
+                    state.current_screen = screen;
+                }
+                state.return_to_screen_at = None;
+            }
         }
     }
 }
@@ -412,5 +444,73 @@ mod tests {
         AppStateMachine::handle_event(&mut state, AppEvent::CupCounterUpdated { cups: 42 });
 
         assert_eq!(state.cup_counter, Some(42));
+    }
+
+    #[test]
+    fn test_shot_started_switches_to_dashboard() {
+        let mut state = GlobalAppState::default();
+        assert_eq!(state.current_screen, Screen::Main);
+
+        AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
+
+        assert_eq!(state.current_screen, Screen::Dashboard);
+        assert_eq!(state.screen_before_extraction, Some(Screen::Main));
+        assert!(state.return_to_screen_at.is_none());
+    }
+
+    #[test]
+    fn test_shot_started_from_dashboard_does_not_save_dashboard() {
+        let mut state = GlobalAppState::default();
+        state.current_screen = Screen::Dashboard;
+
+        AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
+
+        assert_eq!(state.current_screen, Screen::Dashboard);
+        assert_eq!(state.screen_before_extraction, None);
+    }
+
+    #[test]
+    fn test_shot_ended_schedules_return() {
+        let mut state = GlobalAppState::default();
+        AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
+        AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded { duration: 30 });
+
+        assert!(state.return_to_screen_at.is_some());
+    }
+
+    #[test]
+    fn test_tick_returns_to_saved_screen_after_delay() {
+        let mut state = GlobalAppState::default();
+        AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
+        AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded { duration: 30 });
+
+        assert_eq!(state.current_screen, Screen::Dashboard);
+
+        // Tick before the delay — should stay on Dashboard
+        AppStateMachine::tick(&mut state, Instant::now());
+        assert_eq!(state.current_screen, Screen::Dashboard);
+
+        // Tick after the delay has elapsed
+        let past = Instant::now() - EXTRACTION_RETURN_DELAY - Duration::from_millis(1);
+        state.return_to_screen_at = Some(past);
+        AppStateMachine::tick(&mut state, Instant::now());
+
+        assert_eq!(state.current_screen, Screen::Main);
+        assert!(state.screen_before_extraction.is_none());
+        assert!(state.return_to_screen_at.is_none());
+    }
+
+    #[test]
+    fn test_manual_navigation_cancels_return() {
+        let mut state = GlobalAppState::default();
+        AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
+        AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded { duration: 30 });
+
+        assert!(state.return_to_screen_at.is_some());
+
+        AppStateMachine::handle_event(&mut state, AppEvent::NextScreen);
+
+        assert!(state.screen_before_extraction.is_none());
+        assert!(state.return_to_screen_at.is_none());
     }
 }

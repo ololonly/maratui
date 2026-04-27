@@ -1,6 +1,7 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonState};
 use crate::config::AppConfig;
+use crate::screens::Screen;
 use crate::state::{AppEvent, ConnectionStatus};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::Drawable;
@@ -180,6 +181,12 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     Ets::delay_ms(100);
 
     loop {
+        let screen_before = app.current_screen();
+        app.tick();
+        if screen_before == Screen::Main && app.current_screen() != Screen::Main {
+            terminal.clear().unwrap();
+        }
+
         let button1_pressed = button1.is_low();
         let button2_pressed = button2.is_low();
 
@@ -199,8 +206,12 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             });
         }
 
+        let screen_before = app.current_screen();
         while let Ok(telemetry) = rx.try_recv() {
             app.update_telemetry(telemetry);
+        }
+        if screen_before == Screen::Main && app.current_screen() != Screen::Main {
+            terminal.clear().unwrap();
         }
 
         if let Some(cup_counter_rx) = cup_counter_rx.as_mut() {
@@ -211,6 +222,12 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 
         for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
             publish_mqtt_message(&mut mqtt_client, &app_config, &topic_suffix, &payload);
+        }
+
+        if app.backlight_active() {
+            backlight.set_high().unwrap();
+        } else {
+            backlight.set_low().unwrap();
         }
 
         app.render_image(terminal.backend_mut().display_mut());

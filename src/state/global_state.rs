@@ -5,6 +5,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub const EXTRACTION_RETURN_DELAY: Duration = Duration::from_secs(5);
+pub const BACKLIGHT_TIMEOUT: Duration = Duration::from_secs(10);
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConnectionStatus {
     Disabled,
@@ -108,6 +111,12 @@ pub struct GlobalAppState {
     pub outbound_mqtt: VecDeque<MqttOutboundMessage>,
     /// Current error (if any)
     pub error: Option<AppError>,
+    /// Screen to return to after extraction cooldown
+    pub screen_before_extraction: Option<Screen>,
+    /// When to auto-return to `screen_before_extraction`
+    pub return_to_screen_at: Option<Instant>,
+    /// Last time UART telemetry or a button press was received (for backlight timeout)
+    pub last_activity_at: Option<Instant>,
 }
 
 impl Default for GlobalAppState {
@@ -122,6 +131,9 @@ impl Default for GlobalAppState {
             cup_counter: None,
             outbound_mqtt: VecDeque::with_capacity(32),
             error: None,
+            screen_before_extraction: None,
+            return_to_screen_at: None,
+            last_activity_at: None,
         }
     }
 }
@@ -172,6 +184,14 @@ impl GlobalAppState {
 
     pub fn take_outbound_mqtt_messages(&mut self) -> Vec<MqttOutboundMessage> {
         self.outbound_mqtt.drain(..).collect()
+    }
+
+    /// Returns `true` if the backlight should be on (activity within the last `BACKLIGHT_TIMEOUT`)
+    pub fn backlight_should_be_on(&self, now: Instant) -> bool {
+        match self.last_activity_at {
+            Some(last) => now.saturating_duration_since(last) < BACKLIGHT_TIMEOUT,
+            None => false,
+        }
     }
 }
 
@@ -244,5 +264,26 @@ mod tests {
 
         state.clear_error();
         assert!(!state.has_error());
+    }
+
+    #[test]
+    fn test_backlight_off_by_default() {
+        let state = GlobalAppState::default();
+        assert!(!state.backlight_should_be_on(Instant::now()));
+    }
+
+    #[test]
+    fn test_backlight_on_after_activity() {
+        let mut state = GlobalAppState::default();
+        state.last_activity_at = Some(Instant::now());
+        assert!(state.backlight_should_be_on(Instant::now()));
+    }
+
+    #[test]
+    fn test_backlight_off_after_timeout() {
+        let mut state = GlobalAppState::default();
+        let past = Instant::now() - BACKLIGHT_TIMEOUT - Duration::from_millis(1);
+        state.last_activity_at = Some(past);
+        assert!(!state.backlight_should_be_on(Instant::now()));
     }
 }

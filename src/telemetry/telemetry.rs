@@ -360,7 +360,7 @@ mod tests {
 
         let off2 = parse_uart_line("C1.10,039,138,035,0000,1,0").unwrap();
         let (_s3, e3) = update_state_with_events(&mut st, off2, t0 + Duration::from_secs(3));
-        assert_eq!(e3, vec![AppEvent::ShotEnded { duration: 2_800 }]);
+        assert_eq!(e3, vec![AppEvent::ShotEnded { duration: 2 }]);
     }
 
     #[test]
