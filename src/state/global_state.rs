@@ -115,6 +115,8 @@ pub struct GlobalAppState {
     pub screen_before_extraction: Option<Screen>,
     /// When to auto-return to `screen_before_extraction`
     pub return_to_screen_at: Option<Instant>,
+    /// Screen to return to when toggling out of Debug
+    pub screen_before_debug: Option<Screen>,
     /// Last time UART telemetry or a button press was received (for backlight timeout)
     pub last_activity_at: Option<Instant>,
 }
@@ -133,6 +135,7 @@ impl Default for GlobalAppState {
             error: None,
             screen_before_extraction: None,
             return_to_screen_at: None,
+            screen_before_debug: None,
             last_activity_at: None,
         }
     }

@@ -75,9 +75,15 @@ impl AppStateMachine {
             }
 
             AppEvent::DebugScreen => {
-                state.current_screen = Screen::Debug;
-                state.screen_before_extraction = None;
-                state.return_to_screen_at = None;
+                if state.current_screen == Screen::Debug {
+                    // Toggle back to the screen we came from
+                    state.current_screen = state.screen_before_debug.take().unwrap_or(Screen::Main);
+                } else {
+                    state.screen_before_debug = Some(state.current_screen);
+                    state.current_screen = Screen::Debug;
+                    state.screen_before_extraction = None;
+                    state.return_to_screen_at = None;
+                }
             }
 
             AppEvent::ErrorOccurred { error } => {
@@ -114,9 +120,18 @@ impl AppStateMachine {
     /// Handle button press events
     pub fn handle_button_press(state: &mut GlobalAppState, button: Button) {
         state.last_activity_at = Some(Instant::now());
+
+        // Block navigation until the first telemetry frame arrives.
+        // Debug screen (Both) is always accessible.
+        if state.machine_state.last_frame.is_none() {
+            if let Button::Both = button {
+                Self::handle_event(state, AppEvent::DebugScreen);
+            }
+            return;
+        }
+
         match button {
             Button::Button1(ButtonPressType::Short) => {
-                // Handle short press of Button1
                 Self::handle_event(state, AppEvent::NextScreen);
             }
             Button::Button2(ButtonPressType::Short) => {
@@ -371,11 +386,26 @@ mod tests {
     #[test]
     fn test_handle_button_press_short() {
         let mut state = GlobalAppState::default();
+        // Navigation is blocked until first telemetry arrives
+        state.machine_state.last_frame = Some(TelemetryFrame::debug_frame());
         let initial_screen = state.current_screen;
 
         AppStateMachine::handle_button_press(&mut state, Button::Button1(ButtonPressType::Short));
 
         assert_eq!(state.current_screen, initial_screen.next());
+    }
+
+    #[test]
+    fn test_handle_button_press_blocked_before_telemetry() {
+        let mut state = GlobalAppState::default();
+        assert!(state.machine_state.last_frame.is_none());
+        let initial_screen = state.current_screen;
+
+        AppStateMachine::handle_button_press(&mut state, Button::Button1(ButtonPressType::Short));
+        AppStateMachine::handle_button_press(&mut state, Button::Button2(ButtonPressType::Short));
+
+        // Screen must not change while no telemetry
+        assert_eq!(state.current_screen, initial_screen);
     }
 
     #[test]
@@ -498,6 +528,30 @@ mod tests {
         assert_eq!(state.current_screen, Screen::Main);
         assert!(state.screen_before_extraction.is_none());
         assert!(state.return_to_screen_at.is_none());
+    }
+
+    #[test]
+    fn test_debug_screen_toggle() {
+        let mut state = GlobalAppState::default();
+        state.current_screen = Screen::Dashboard;
+
+        // Enter Debug
+        AppStateMachine::handle_event(&mut state, AppEvent::DebugScreen);
+        assert_eq!(state.current_screen, Screen::Debug);
+
+        // Toggle back — should return to Dashboard
+        AppStateMachine::handle_event(&mut state, AppEvent::DebugScreen);
+        assert_eq!(state.current_screen, Screen::Dashboard);
+        assert!(state.screen_before_debug.is_none());
+    }
+
+    #[test]
+    fn test_debug_screen_toggle_fallback_to_main() {
+        let mut state = GlobalAppState::default();
+        // Enter Debug without prior screen set (default Main)
+        AppStateMachine::handle_event(&mut state, AppEvent::DebugScreen);
+        AppStateMachine::handle_event(&mut state, AppEvent::DebugScreen);
+        assert_eq!(state.current_screen, Screen::Main);
     }
 
     #[test]

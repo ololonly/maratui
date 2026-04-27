@@ -1,6 +1,6 @@
 use crate::button::Button;
 use crate::run_app;
-use crate::screens::{Board, Dashboard, Debug, Graphs, Rat, Screen};
+use crate::screens::{Board, Connecting, Dashboard, Debug, Graphs, Rat, Screen};
 use crate::state::{AppError, AppEvent, AppStateMachine, ConnectionStatus, GlobalAppState};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::Drawable;
@@ -70,6 +70,16 @@ impl MaraUiApp for MaraUi {
     /// This is being called in the main loop to render the UI
     fn draw(&self, frame: &mut Frame) {
         let area = frame.area();
+
+        // Show connecting screen until first UART frame arrives.
+        // Debug screen is always accessible for diagnostics.
+        if self.state.machine_state.last_frame.is_none()
+            && self.state.current_screen != Screen::Debug
+        {
+            Connecting::render(&self.state, area, frame);
+            return;
+        }
+
         match self.state.current_screen {
             Screen::Main => Rat::render(&self.state, area, frame),
             Screen::Dashboard => Dashboard::render(&self.state, area, frame),
@@ -126,6 +136,9 @@ impl MaraUiApp for MaraUi {
         D::Error: core::fmt::Debug,
     {
         if self.state.current_screen != Screen::Main {
+            return;
+        }
+        if self.state.machine_state.last_frame.is_none() {
             return;
         }
 

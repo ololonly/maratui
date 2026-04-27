@@ -26,9 +26,8 @@ impl Board for Dashboard {
     fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         let buf = frame.buffer_mut();
 
-        let t_frame = match &state.machine_state.last_frame {
-            Some(f) => f.clone(),
-            None => TelemetryFrame::debug_frame(),
+        let Some(t_frame) = state.machine_state.last_frame.clone() else {
+            return;
         };
 
         // banner (1) | main (fill) | boiler (3)
