@@ -35,7 +35,7 @@ impl Connecting {
         .areas(inner);
 
         Paragraph::new(vec![
-            Line::styled("═══ MARA ═══", Style::new().yellow()),
+            Line::styled("═══ MARATUI ═══", Style::new().yellow()),
             Line::raw(""),
             Line::styled("waiting for machine...", Style::new().dark_gray()),
         ])
