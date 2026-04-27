@@ -272,11 +272,7 @@ fn render_shot_gauge(state: &GlobalAppState, area: Rect, buf: &mut Buffer) {
     let total = inner.height as usize;
     let ratio = (extraction_secs as f64 / SHOT_GAUGE_MAX_SECS as f64).min(1.0);
     let filled = (ratio * total as f64).round() as usize;
-    let fill_style = if state.extraction_state.is_extracting() {
-        shot_digit_style(extraction_secs)
-    } else {
-        shot_indicator_style(extraction_secs)
-    };
+    let fill_style = shot_style(extraction_secs, state.extraction_state.is_extracting());
     let fill: String = "█".repeat(inner.width as usize);
     let empty: String = "░".repeat(inner.width as usize);
 
@@ -295,14 +291,13 @@ fn render_timer(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
     let buf = frame.buffer_mut();
     let extraction_secs = current_extraction_secs(state);
 
-    let digit_style = if state.extraction_state.is_extracting()
-        || state.extraction_state.last_extraction_duration().is_some()
-    {
-        shot_digit_style(extraction_secs)
+    let timer_style = if state.extraction_state.is_extracting() {
+        shot_style(extraction_secs, true)
+    } else if state.extraction_state.last_extraction_duration().is_some() {
+        shot_style(extraction_secs, false)
     } else {
         Style::new().dark_gray()
     };
-    let label_style = shot_indicator_style(extraction_secs);
 
     let timer_block = Block::bordered()
         .title_bottom("Extraction")
@@ -318,7 +313,7 @@ fn render_timer(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         .pixel_size(PixelSize::Full)
         .centered()
         .lines(vec![extraction_secs.to_string().into()])
-        .style(digit_style)
+        .style(timer_style)
         .build();
 
     frame.render_widget(big_text, timer_inner);
@@ -336,7 +331,7 @@ fn render_timer(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         };
         Paragraph::new(Line::from(shot_quality_label(extraction_secs)))
             .centered()
-            .style(label_style)
+            .style(timer_style)
             .render(label_area, buf);
     }
 }
@@ -357,22 +352,20 @@ fn current_extraction_secs(state: &GlobalAppState) -> u64 {
     }
 }
 
-/// Style for the big timer digit — never red, always calm and readable.
-fn shot_digit_style(secs: u64) -> Style {
-    match secs {
-        0..=19 => Style::new().white(),
-        20..=27 => Style::new().green(),
-        _ => Style::new().yellow(),
-    }
-}
-
-/// Style for indicators (gauge fill, quality label) — full semantic colors including red.
-fn shot_indicator_style(secs: u64) -> Style {
-    match secs {
-        0..=14 => Style::new().red(),
-        15..=19 => Style::new().yellow(),
-        20..=30 => Style::new().green(),
-        _ => Style::new().yellow(),
+fn shot_style(secs: u64, is_live: bool) -> Style {
+    if is_live {
+        match secs {
+            0..=19 => Style::new().white(),
+            20..=27 => Style::new().green(),
+            _ => Style::new().yellow(),
+        }
+    } else {
+        match secs {
+            0..=14 => Style::new().red(),
+            15..=19 => Style::new().yellow(),
+            20..=30 => Style::new().green(),
+            _ => Style::new().yellow(),
+        }
     }
 }
 
