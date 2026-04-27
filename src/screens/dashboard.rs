@@ -12,9 +12,12 @@ use crate::screens::screen::Board;
 use crate::state::GlobalAppState;
 use crate::telemetry::{MachineMode, TelemetryFrame};
 
-/// Absolute temperature scale for the boiler bar (°C)
-const BOILER_SCALE_MAX: u16 = 150;
+const BOILER_SCALE_MAX: u16 = 160;
 const SHOT_GAUGE_MAX_SECS: u64 = 30;
+const HX_SCALE_MIN: f64 = 60.0;
+const HX_SCALE_MAX: f64 = 110.0;
+const HX_IDEAL_LOW: f64 = 90.0;
+const HX_IDEAL_HIGH: f64 = 95.0;
 
 #[derive(Default)]
 pub struct Dashboard;
@@ -79,13 +82,19 @@ fn render_info_col(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     let [hx_area, status_area] =
         Layout::vertical([Constraint::Fill(1), Constraint::Length(4)]).areas(inner);
 
+    // Split hx area: label+value on left, mini vertical gauge on right
+    let [hx_text_area, hx_gauge_area] =
+        Layout::horizontal([Constraint::Fill(1), Constraint::Length(2)]).areas(hx_area);
+
     Paragraph::new(vec![
         Line::styled("HX", Style::new().dark_gray()),
         Line::raw(""),
         Line::styled(format!("{}°", t_frame.hx_now_c), Style::new().cyan()),
     ])
     .centered()
-    .render(hx_area, buf);
+    .render(hx_text_area, buf);
+
+    render_hx_vgauge(t_frame.hx_now_c, hx_gauge_area, buf);
 
     let heat_span = Span::styled(
         if t_frame.heating_on {
@@ -113,12 +122,63 @@ fn render_info_col(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     );
 
     Paragraph::new(vec![
+        Line::raw(""),
         Line::from(heat_span),
         Line::raw(""),
         Line::from(pump_span),
     ])
     .centered()
     .render(status_area, buf);
+}
+
+/// Vertical mini-gauge for HX temperature.
+///
+/// Scale 60–110°C. Ideal zone 90–95°C is marked with `▒` even when unfilled.
+/// Colors: white (cold) → green (ideal 88–95°) → yellow (95–100°) → red (>100°).
+fn render_hx_vgauge(temp: u16, area: Rect, buf: &mut Buffer) {
+    let total = area.height as usize;
+    if total == 0 || area.width == 0 {
+        return;
+    }
+
+    let ratio = ((temp as f64 - HX_SCALE_MIN) / (HX_SCALE_MAX - HX_SCALE_MIN)).clamp(0.0, 1.0);
+    let filled = (ratio * total as f64).round() as usize;
+
+    // Convert temperature to row index (bar fills from bottom, so higher temp = lower row index)
+    let temp_to_row = |t: f64| -> usize {
+        let r = ((t - HX_SCALE_MIN) / (HX_SCALE_MAX - HX_SCALE_MIN)).clamp(0.0, 1.0);
+        total.saturating_sub((r * total as f64).round() as usize)
+    };
+    let ideal_top_row = temp_to_row(HX_IDEAL_HIGH);
+    let ideal_bot_row = temp_to_row(HX_IDEAL_LOW);
+
+    let fill_style = match temp {
+        0..=87 => Style::new().white(),
+        88..=95 => Style::new().green(),
+        96..=100 => Style::new().yellow(),
+        _ => Style::new().red(),
+    };
+
+    let w = area.width as usize;
+    let fill = "█".repeat(w);
+    let empty = "░".repeat(w);
+    let ideal = "▒".repeat(w);
+
+    for row in 0..total {
+        let y = area.y + row as u16;
+        let is_filled = row >= total.saturating_sub(filled);
+        let in_ideal = row >= ideal_top_row && row < ideal_bot_row;
+
+        let (s, style) = if is_filled {
+            (fill.as_str(), fill_style)
+        } else if in_ideal {
+            (ideal.as_str(), Style::new().green())
+        } else {
+            (empty.as_str(), Style::new().dark_gray())
+        };
+
+        buf.set_string(area.x, y, s, style);
+    }
 }
 
 /// Custom boiler bar with absolute temperature scale, color zones, and target marker.
@@ -212,7 +272,11 @@ fn render_shot_gauge(state: &GlobalAppState, area: Rect, buf: &mut Buffer) {
     let total = inner.height as usize;
     let ratio = (extraction_secs as f64 / SHOT_GAUGE_MAX_SECS as f64).min(1.0);
     let filled = (ratio * total as f64).round() as usize;
-    let fill_style = shot_style(extraction_secs, state.extraction_state.is_extracting());
+    let fill_style = if state.extraction_state.is_extracting() {
+        shot_digit_style(extraction_secs)
+    } else {
+        shot_indicator_style(extraction_secs)
+    };
     let fill: String = "█".repeat(inner.width as usize);
     let empty: String = "░".repeat(inner.width as usize);
 
@@ -231,16 +295,17 @@ fn render_timer(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
     let buf = frame.buffer_mut();
     let extraction_secs = current_extraction_secs(state);
 
-    let timer_style = if state.extraction_state.is_extracting() {
-        shot_style(extraction_secs, true)
-    } else if state.extraction_state.last_extraction_duration().is_some() {
-        shot_style(extraction_secs, false)
+    let digit_style = if state.extraction_state.is_extracting()
+        || state.extraction_state.last_extraction_duration().is_some()
+    {
+        shot_digit_style(extraction_secs)
     } else {
         Style::new().dark_gray()
     };
+    let label_style = shot_indicator_style(extraction_secs);
 
     let timer_block = Block::bordered()
-        .title("Extraction")
+        .title_bottom("Extraction")
         .title_alignment(ratatui::layout::HorizontalAlignment::Center)
         .border_type(BorderType::Rounded)
         .border_style(Style::new().yellow())
@@ -253,7 +318,7 @@ fn render_timer(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         .pixel_size(PixelSize::Full)
         .centered()
         .lines(vec![extraction_secs.to_string().into()])
-        .style(timer_style)
+        .style(digit_style)
         .build();
 
     frame.render_widget(big_text, timer_inner);
@@ -264,14 +329,14 @@ fn render_timer(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
     {
         let buf = frame.buffer_mut();
         let label_area = Rect {
-            x: area.x,
+            x: timer_inner.x,
             y: area.y + area.height.saturating_sub(2),
-            width: area.width,
+            width: timer_inner.width,
             height: 1,
         };
         Paragraph::new(Line::from(shot_quality_label(extraction_secs)))
             .centered()
-            .style(timer_style)
+            .style(label_style)
             .render(label_area, buf);
     }
 }
@@ -292,20 +357,22 @@ fn current_extraction_secs(state: &GlobalAppState) -> u64 {
     }
 }
 
-fn shot_style(secs: u64, is_live: bool) -> Style {
-    if is_live {
-        match secs {
-            0..=19 => Style::new().white(),
-            20..=27 => Style::new().green(),
-            _ => Style::new().yellow(),
-        }
-    } else {
-        match secs {
-            0..=14 => Style::new().red(),
-            15..=19 => Style::new().yellow(),
-            20..=30 => Style::new().green(),
-            _ => Style::new().yellow(),
-        }
+/// Style for the big timer digit — never red, always calm and readable.
+fn shot_digit_style(secs: u64) -> Style {
+    match secs {
+        0..=19 => Style::new().white(),
+        20..=27 => Style::new().green(),
+        _ => Style::new().yellow(),
+    }
+}
+
+/// Style for indicators (gauge fill, quality label) — full semantic colors including red.
+fn shot_indicator_style(secs: u64) -> Style {
+    match secs {
+        0..=14 => Style::new().red(),
+        15..=19 => Style::new().yellow(),
+        20..=30 => Style::new().green(),
+        _ => Style::new().yellow(),
     }
 }
 
