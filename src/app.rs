@@ -116,7 +116,8 @@ impl MaraUiApp for MaraUi {
     }
 
     fn backlight_active(&self) -> bool {
-        self.state.backlight_should_be_on(Instant::now())
+        self.state.current_screen == Screen::Debug
+            || self.state.backlight_should_be_on(Instant::now())
     }
 
     fn current_screen(&self) -> Screen {

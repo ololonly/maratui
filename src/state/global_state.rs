@@ -119,6 +119,8 @@ pub struct GlobalAppState {
     pub screen_before_debug: Option<Screen>,
     /// Last time UART telemetry or a button press was received (for backlight timeout)
     pub last_activity_at: Option<Instant>,
+    /// Last time a UART telemetry frame was received (for Debug screen activity marker)
+    pub last_uart_frame_at: Option<Instant>,
 }
 
 impl Default for GlobalAppState {
@@ -137,6 +139,7 @@ impl Default for GlobalAppState {
             return_to_screen_at: None,
             screen_before_debug: None,
             last_activity_at: None,
+            last_uart_frame_at: None,
         }
     }
 }

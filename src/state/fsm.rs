@@ -226,6 +226,7 @@ impl AppStateMachine {
         // Store the latest telemetry frame and record activity time
         state.machine_state.last_frame = Some(frame);
         state.last_activity_at = Some(now);
+        state.last_uart_frame_at = Some(now);
 
         // Process each event through the FSM
         for event in events {
