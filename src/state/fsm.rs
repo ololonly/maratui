@@ -33,7 +33,7 @@ impl AppStateMachine {
                 state.error = None;
                 // Auto-switch to Dashboard and remember where to return
                 if state.current_screen != Screen::Dashboard
-                    || state.current_screen != Screen::Debug
+                    && state.current_screen != Screen::Debug
                 {
                     state.screen_before_extraction = Some(state.current_screen);
                     state.return_to_screen_at = None;
@@ -249,13 +249,13 @@ impl AppStateMachine {
 
     /// Check time-based transitions (call once per main loop iteration)
     pub fn tick(state: &mut GlobalAppState, now: Instant) {
-        if let Some(return_at) = state.return_to_screen_at {
-            if now >= return_at {
-                if let Some(screen) = state.screen_before_extraction.take() {
-                    state.current_screen = screen;
-                }
-                state.return_to_screen_at = None;
+        if let Some(return_at) = state.return_to_screen_at
+            && now >= return_at
+        {
+            if let Some(screen) = state.screen_before_extraction.take() {
+                state.current_screen = screen;
             }
+            state.return_to_screen_at = None;
         }
     }
 }

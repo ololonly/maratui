@@ -378,7 +378,12 @@ fn init_networking(
     }
 
     info!("MQTT started: {}", app_config.mqtt.url);
-    (Some(esp_wifi), Some(mqtt_client), Some(cup_counter_rx), Some(mqtt_status_rx))
+    (
+        Some(esp_wifi),
+        Some(mqtt_client),
+        Some(cup_counter_rx),
+        Some(mqtt_status_rx),
+    )
 }
 
 fn publish_mqtt_message(
