@@ -53,9 +53,9 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
     let backend = EmbeddedBackend::new(&mut display, config);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    let (mut mqtt, mut cup_counter_rx) = init_simulator_mqtt(&app_config);
+    let (mut mqtt, mut cup_counter_rx, mut mqtt_status_rx) = init_simulator_mqtt(&app_config);
     if mqtt.is_some() {
-        app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connected));
+        app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));
     } else {
         app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Disabled));
     }
@@ -131,8 +131,18 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
             }
         }
 
-        for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
-            publish_mqtt_message(&mut mqtt, &app_config, &topic_suffix, &payload);
+        if let Some(status_rx) = mqtt_status_rx.as_mut() {
+            while let Ok(status) = status_rx.try_recv() {
+                app.handle_event(AppEvent::MqttStatusChanged(status));
+            }
+        }
+
+        let (_, mqtt_status) = app.connection_statuses();
+        let messages = app.take_outbound_mqtt_messages();
+        if mqtt_status == ConnectionStatus::Connected {
+            for (topic_suffix, payload) in messages {
+                publish_mqtt_message(&mut mqtt, &app_config, &topic_suffix, &payload);
+            }
         }
 
         if let Some(cup_counter_rx) = cup_counter_rx.as_mut() {
@@ -143,13 +153,15 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
     }
 }
 
-fn init_simulator_mqtt(cfg: &AppConfig) -> (Option<Client>, Option<Receiver<u64>>) {
+fn init_simulator_mqtt(
+    cfg: &AppConfig,
+) -> (Option<Client>, Option<Receiver<u64>>, Option<Receiver<ConnectionStatus>>) {
     if !cfg.mqtt.enabled {
-        return (None, None);
+        return (None, None, None);
     }
 
     let Some((host, port)) = parse_mqtt_host_port(&cfg.mqtt.url) else {
-        return (None, None);
+        return (None, None, None);
     };
     let mut options = MqttOptions::new(cfg.mqtt.client_id.clone(), host, port);
     options.set_keep_alive(Duration::from_secs(30));
@@ -161,27 +173,33 @@ fn init_simulator_mqtt(cfg: &AppConfig) -> (Option<Client>, Option<Receiver<u64>
     let (client, mut connection) = Client::new(options, 10);
     let cup_counter_topic = format!("{}/cup_counter", cfg.mqtt.topic_prefix);
     let (cup_counter_tx, cup_counter_rx) = mpsc::channel::<u64>();
+    let (mqtt_status_tx, mqtt_status_rx) = mpsc::channel::<ConnectionStatus>();
 
     let _ = client.subscribe(&cup_counter_topic, QoS::AtMostOnce);
 
     std::thread::spawn(move || {
         for notification in connection.iter() {
-            let Ok(Event::Incoming(Packet::Publish(publish))) = notification else {
-                continue;
-            };
-
-            if publish.topic != cup_counter_topic {
-                continue;
-            }
-
-            if let Ok(payload) = core::str::from_utf8(&publish.payload)
-                && let Ok(cups) = payload.trim().parse::<u64>()
-            {
-                let _ = cup_counter_tx.send(cups);
+            match notification {
+                Ok(Event::Incoming(Packet::ConnAck(_))) => {
+                    let _ = mqtt_status_tx.send(ConnectionStatus::Connected);
+                }
+                Err(_) => {
+                    let _ = mqtt_status_tx.send(ConnectionStatus::Connecting);
+                }
+                Ok(Event::Incoming(Packet::Publish(publish))) => {
+                    if publish.topic == cup_counter_topic {
+                        if let Ok(payload) = core::str::from_utf8(&publish.payload)
+                            && let Ok(cups) = payload.trim().parse::<u64>()
+                        {
+                            let _ = cup_counter_tx.send(cups);
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     });
-    (Some(client), Some(cup_counter_rx))
+    (Some(client), Some(cup_counter_rx), Some(mqtt_status_rx))
 }
 
 fn parse_mqtt_host_port(url: &str) -> Option<(String, u16)> {

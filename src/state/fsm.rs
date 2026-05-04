@@ -1,6 +1,8 @@
 use log::info;
 
-use super::{AppError, AppEvent, ExtractionState, GlobalAppState, global_state::EXTRACTION_RETURN_DELAY};
+use super::{
+    AppError, AppEvent, ExtractionState, GlobalAppState, global_state::EXTRACTION_RETURN_DELAY,
+};
 use crate::button::{Button, ButtonPressType};
 use crate::screens::Screen;
 use crate::telemetry::{TelemetryFrame, update_state_with_events};
@@ -30,11 +32,13 @@ impl AppStateMachine {
                 // Clear error when extraction starts
                 state.error = None;
                 // Auto-switch to Dashboard and remember where to return
-                if state.current_screen != Screen::Dashboard {
+                if state.current_screen != Screen::Dashboard
+                    || state.current_screen != Screen::Debug
+                {
                     state.screen_before_extraction = Some(state.current_screen);
+                    state.return_to_screen_at = None;
+                    state.current_screen = Screen::Dashboard;
                 }
-                state.return_to_screen_at = None;
-                state.current_screen = Screen::Dashboard;
             }
 
             AppEvent::ShotEnded { duration } => {
@@ -43,8 +47,7 @@ impl AppStateMachine {
                 };
                 // Schedule return to the previous screen after the cooldown
                 if state.screen_before_extraction.is_some() {
-                    state.return_to_screen_at =
-                        Some(Instant::now() + EXTRACTION_RETURN_DELAY);
+                    state.return_to_screen_at = Some(Instant::now() + EXTRACTION_RETURN_DELAY);
                 }
             }
 

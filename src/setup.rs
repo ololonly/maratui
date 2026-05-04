@@ -139,14 +139,14 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connecting));
     app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));
 
-    let (_wifi, mut mqtt_client, mut cup_counter_rx) = init_networking(modem, &app_config);
+    let (_wifi, mut mqtt_client, mut cup_counter_rx, mut mqtt_status_rx) =
+        init_networking(modem, &app_config);
 
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connected));
-    if mqtt_client.is_some() {
-        app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connected));
-    } else {
+    if mqtt_client.is_none() {
         app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Disabled));
     }
+    // MQTT Connected/Connecting status arrives via mqtt_status_rx in the main loop
 
     let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
 
@@ -220,6 +220,12 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             }
         }
 
+        if let Some(status_rx) = mqtt_status_rx.as_mut() {
+            while let Ok(status) = status_rx.try_recv() {
+                app.handle_event(AppEvent::MqttStatusChanged(status));
+            }
+        }
+
         for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
             publish_mqtt_message(&mut mqtt_client, &app_config, &topic_suffix, &payload);
         }
@@ -247,6 +253,7 @@ fn init_networking(
     Option<EspWifi<'static>>,
     Option<EspMqttClient<'static>>,
     Option<Receiver<u64>>,
+    Option<Receiver<ConnectionStatus>>,
 ) {
     let sys_loop = EspSystemEventLoop::take().expect("Failed to take system event loop");
     let nvs = EspDefaultNvsPartition::take().ok();
@@ -303,13 +310,14 @@ fn init_networking(
 
     if !app_config.mqtt.enabled {
         info!("MQTT is disabled by MARATUI_MQTT_ENABLED");
-        return (Some(esp_wifi), None, None);
+        return (Some(esp_wifi), None, None, None);
     }
 
     let cup_counter_topic = format!("{}/cup_counter", app_config.mqtt.topic_prefix);
     let callback_topic = cup_counter_topic.clone();
     let (cup_counter_tx, cup_counter_rx) = mpsc::channel::<u64>();
     let (connected_tx, connected_rx) = mpsc::sync_channel::<()>(1);
+    let (mqtt_status_tx, mqtt_status_rx) = mpsc::channel::<ConnectionStatus>();
 
     info!("Starting MQTT client: {}", app_config.mqtt.url);
     let mut mqtt_client = EspMqttClient::new_cb(
@@ -328,6 +336,10 @@ fn init_networking(
             EventPayload::Connected(_) => {
                 info!("MQTT connected");
                 let _ = connected_tx.try_send(());
+                let _ = mqtt_status_tx.send(ConnectionStatus::Connected);
+            }
+            EventPayload::Disconnected => {
+                let _ = mqtt_status_tx.send(ConnectionStatus::Connecting);
             }
             EventPayload::Received {
                 topic: Some(topic),
@@ -366,7 +378,7 @@ fn init_networking(
     }
 
     info!("MQTT started: {}", app_config.mqtt.url);
-    (Some(esp_wifi), Some(mqtt_client), Some(cup_counter_rx))
+    (Some(esp_wifi), Some(mqtt_client), Some(cup_counter_rx), Some(mqtt_status_rx))
 }
 
 fn publish_mqtt_message(
