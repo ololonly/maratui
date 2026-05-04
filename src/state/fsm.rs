@@ -33,7 +33,7 @@ impl AppStateMachine {
                 state.error = None;
                 // Auto-switch to Dashboard and remember where to return
                 if state.current_screen != Screen::Dashboard
-                    || state.current_screen != Screen::Debug
+                    && state.current_screen != Screen::Debug
                 {
                     state.screen_before_extraction = Some(state.current_screen);
                     state.return_to_screen_at = None;
