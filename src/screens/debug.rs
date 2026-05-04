@@ -2,9 +2,12 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::Paragraph;
 use ratatui::{Frame, widgets::Widget};
+use std::time::{Duration, Instant};
 
 use crate::screens::screen::Board;
 use crate::state::GlobalAppState;
+
+const UART_ACTIVITY_FLASH: Duration = Duration::from_millis(250);
 
 /// Debug screen showing raw UART telemetry data
 #[derive(Default)]
@@ -26,9 +29,15 @@ impl Board for Debug {
             state.wifi_status, state.mqtt_status
         );
 
+        let now = Instant::now();
+        let activity_marker = match state.last_uart_frame_at {
+            Some(t) if now.saturating_duration_since(t) < UART_ACTIVITY_FLASH => "●",
+            _ => " ",
+        };
+
         let text = match &state.machine_state.last_frame {
-            Some(telemetry) => format!("UART: {}", telemetry.raw_string),
-            None => "UART: No data (waiting for connection...)".to_string(),
+            Some(telemetry) => format!("UART{} {}", activity_marker, telemetry.raw_string),
+            None => format!("UART{}No data (waiting for connection...)", activity_marker),
         };
 
         let lines = state.events_log.iter().map(|s| Line::from(s.to_string()));
