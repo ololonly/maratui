@@ -1,7 +1,7 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
-use crate::screens::Screen;
 use crate::config::AppConfig;
+use crate::screens::Screen;
 use crate::state::{AppEvent, ConnectionStatus};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::Size;
@@ -155,7 +155,11 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
 
 fn init_simulator_mqtt(
     cfg: &AppConfig,
-) -> (Option<Client>, Option<Receiver<u64>>, Option<Receiver<ConnectionStatus>>) {
+) -> (
+    Option<Client>,
+    Option<Receiver<u64>>,
+    Option<Receiver<ConnectionStatus>>,
+) {
     if !cfg.mqtt.enabled {
         return (None, None, None);
     }
@@ -187,12 +191,11 @@ fn init_simulator_mqtt(
                     let _ = mqtt_status_tx.send(ConnectionStatus::Connecting);
                 }
                 Ok(Event::Incoming(Packet::Publish(publish))) => {
-                    if publish.topic == cup_counter_topic {
-                        if let Ok(payload) = core::str::from_utf8(&publish.payload)
-                            && let Ok(cups) = payload.trim().parse::<u64>()
-                        {
-                            let _ = cup_counter_tx.send(cups);
-                        }
+                    if publish.topic == cup_counter_topic
+                        && let Ok(payload) = core::str::from_utf8(&publish.payload)
+                        && let Ok(cups) = payload.trim().parse::<u64>()
+                    {
+                        let _ = cup_counter_tx.send(cups);
                     }
                 }
                 _ => {}

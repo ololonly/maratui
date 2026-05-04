@@ -255,13 +255,13 @@ pub fn update_state_with_events(
     };
 
     // 1) Mode change event
-    if let Some(pm) = prev_mode {
-        if pm != frame.mode {
-            events.push(AppEvent::ModeChanged {
-                from: pm,
-                to: frame.mode,
-            });
-        }
+    if let Some(pm) = prev_mode
+        && pm != frame.mode
+    {
+        events.push(AppEvent::ModeChanged {
+            from: pm,
+            to: frame.mode,
+        });
     }
 
     // 2) Pump timer + shot start/end events
@@ -278,7 +278,7 @@ pub fn update_state_with_events(
             // Shot ended
             let duration = state
                 .shot_started_at
-                .map(|started_at| now.saturating_duration_since(started_at).as_secs() as u64)
+                .map(|started_at| now.saturating_duration_since(started_at).as_secs())
                 .unwrap_or(0);
             state.shot_started_at = None;
             events.push(AppEvent::ShotEnded { duration });

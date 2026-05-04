@@ -8,19 +8,14 @@ use std::{
 pub const EXTRACTION_RETURN_DELAY: Duration = Duration::from_secs(5);
 pub const BACKLIGHT_TIMEOUT: Duration = Duration::from_secs(10);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum ConnectionStatus {
     Disabled,
+    #[default]
     Disconnected,
     Connecting,
     Connected,
     Error(String),
-}
-
-impl Default for ConnectionStatus {
-    fn default() -> Self {
-        Self::Disconnected
-    }
 }
 
 #[derive(Clone, Debug)]

@@ -28,7 +28,7 @@ impl Screen {
         let screens = Self::rotatable();
         let pos = screens.iter().position(|s| *s == self);
         match pos {
-            Some(i) if i == 0 => screens[screens.len() - 1],
+            Some(0) => screens[screens.len() - 1],
             Some(i) => screens[i - 1],
             None => Screen::Main,
         }
