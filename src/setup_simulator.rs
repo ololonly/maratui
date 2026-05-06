@@ -76,7 +76,7 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
 
         for event in simulator_window.borrow_mut().events() {
             match event {
-                SimulatorEvent::Quit => panic!("simulator window closed"),
+                SimulatorEvent::Quit => std::process::exit(0),
                 SimulatorEvent::KeyDown {
                     keycode, repeat, ..
                 } => {
