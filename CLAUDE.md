@@ -97,10 +97,7 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 
 ## Known Bugs / Issues
 
-### 1. `MachineState.on` is a dead field (`src/telemetry/telemetry.rs:213`)
-The `on: bool` field in `MachineState` is initialized `false` and never written after that. Actual pump state is always read from `TelemetryFrame.pump_on`. Safe to remove.
-
-### 2. `SimulatorEvent::Quit` panics instead of exiting (`src/setup_simulator.rs:79`)
+### 1. `SimulatorEvent::Quit` panics instead of exiting (`src/setup_simulator.rs:79`)
 Closing the SDL window calls `panic!("simulator window closed")`. The process should exit cleanly with `std::process::exit(0)` or by breaking the loop.
 
 ### 3. `eprintln!` in FSM error handler (`src/state/fsm.rs:95`)

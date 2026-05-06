@@ -209,7 +209,6 @@ pub enum AppEvent {
 /// Runtime state used to compute derived values (pump duration, transitions).
 #[derive(Debug)]
 pub struct MachineState {
-    pub on: bool,
     pub last_frame: Option<TelemetryFrame>,
     pub last_update: Option<Instant>,
     pub shot_started_at: Option<Instant>,
@@ -226,7 +225,6 @@ pub struct MachineState {
 impl Default for MachineState {
     fn default() -> Self {
         Self {
-            on: false,
             last_frame: None,
             last_update: None,
             shot_started_at: None,
