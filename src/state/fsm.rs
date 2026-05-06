@@ -1,4 +1,4 @@
-use log::info;
+use log::{error, info};
 
 use super::{
     AppError, AppEvent, ExtractionState, GlobalAppState, global_state::EXTRACTION_RETURN_DELAY,
@@ -92,7 +92,7 @@ impl AppStateMachine {
             AppEvent::ErrorOccurred { error } => {
                 state.error = Some(AppError::MachineOffline);
                 // Log the error (logging can be added here)
-                eprintln!("Application error: {}", error);
+                error!("Application error: {}", error);
             }
 
             AppEvent::ErrorCleared => {

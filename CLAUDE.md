@@ -97,10 +97,7 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 
 ## Known Bugs / Issues
 
-### 1. `eprintln!` in FSM error handler (`src/state/fsm.rs:95`)
-`AppEvent::ErrorOccurred` uses `eprintln!` while the rest of the codebase uses `log::warn!`. On the ESP32 target `eprintln!` routes to a different sink than the ESP log system. Use `log::error!` for consistency.
-
-### 4. `AppConfig::telemetry_topic()` is defined but never called (`src/config.rs:76`)
+### 1. `AppConfig::telemetry_topic()` is defined but never called (`src/config.rs:76`)
 Dead method. Remove or use it to replace the inline `format!("{}/telemetry", ...)` in the FSM.
 
 ### 5. `is_telemetry_event()` misclassifies infrastructure events (`src/state/app_events.rs:73`)
