@@ -34,7 +34,7 @@ Uses `espflash flash --monitor` as the runner (configured in `.cargo/config.toml
 ```bash
 cargo test --no-default-features --features simulator --target x86_64-unknown-linux-gnu
 ```
-Tests live inline in `src/state/fsm.rs` and `src/telemetry/telemetry.rs`.
+Tests live inline in `src/state/fsm.rs`, `src/state/global_state.rs`, `src/state/app_events.rs`, and `src/telemetry/telemetry.rs`.
 
 ## Configuration
 
@@ -90,3 +90,51 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 | Space | Inject no-water debug frame |
 | D | Button1+Button2 (Debug screen) |
 | M | Publish manual MQTT event |
+
+---
+
+## Known Bottlenecks
+
+### 1. `GlobalAppState` derives `Clone` over ~7 KB of VecDeque data
+`GlobalAppState` derives `Clone` and contains three `VecDeque<f64>` each holding up to 300 elements. An accidental clone (e.g. passing state by value) would silently copy all that heap data. Consider removing the `Clone` impl unless it is intentionally used.
+
+---
+
+## Known Bugs / Issues
+
+### 1. `MachineState.on` is a dead field (`src/telemetry/telemetry.rs:213`)
+The `on: bool` field in `MachineState` is initialized `false` and never written after that. Actual pump state is always read from `TelemetryFrame.pump_on`. Safe to remove.
+
+### 2. `SimulatorEvent::Quit` panics instead of exiting (`src/setup_simulator.rs:79`)
+Closing the SDL window calls `panic!("simulator window closed")`. The process should exit cleanly with `std::process::exit(0)` or by breaking the loop.
+
+### 3. `eprintln!` in FSM error handler (`src/state/fsm.rs:95`)
+`AppEvent::ErrorOccurred` uses `eprintln!` while the rest of the codebase uses `log::warn!`. On the ESP32 target `eprintln!` routes to a different sink than the ESP log system. Use `log::error!` for consistency.
+
+### 4. `AppConfig::telemetry_topic()` is defined but never called (`src/config.rs:76`)
+Dead method. Remove or use it to replace the inline `format!("{}/telemetry", ...)` in the FSM.
+
+### 5. `is_telemetry_event()` misclassifies infrastructure events (`src/state/app_events.rs:73`)
+`WifiStatusChanged`, `MqttStatusChanged`, `CupCounterUpdated`, and `PublishMqttEvent` are currently in `is_telemetry_event()`'s match arm but are not telemetry events — they're connection/infrastructure events. This causes them to appear in the on-screen event log (`events_log`) unexpectedly.
+
+### 6. Button long-press >2000 ms is silently dropped (`src/button.rs:89`)
+`ButtonState::update` only recognises short (< 500 ms) and long (500–2000 ms). Any press longer than 2000 ms is ignored with no feedback. This is intentional "veto zone" behaviour but is undocumented.
+
+---
+
+## Security Considerations
+
+### Credentials baked into the binary at compile time
+Wi-Fi SSID/password and MQTT credentials are embedded via `option_env!()` in `build.rs` and stored as plaintext `&'static str` in the flash image. Anyone with physical access and an SPI flash reader can extract them with standard binary analysis tools (`strings`, `binwalk`). **Rotate credentials if the device is shared or its firmware is distributed.**
+
+### Default MQTT broker is public and unauthenticated
+The default `MARATUI_MQTT_URL=mqtt://broker.emqx.io:1883` publishes machine telemetry to a free public broker with no access control. Any client that knows or guesses the topic prefix (`mara/telemetry`) can read all extraction data. Always set a private broker with authentication before deploying.
+
+### No TLS for MQTT
+The `mqtt://` scheme is plaintext TCP. The `esp-idf-svc` MQTT client supports TLS via `mqtts://` — switch to it and configure a CA certificate for the broker. Until then, credentials and telemetry travel unencrypted on the local network.
+
+### Open Wi-Fi fallback
+In `setup.rs:286`, if `wifi_cfg.password` is empty, `AuthMethod::None` is used (open network association). This is intentional for open-network environments but may be surprising — add a config-time log warning when `AuthMethod::None` is selected.
+
+### UART input is not sanitised beyond ASCII gating
+`uart_reader.rs` only rejects non-ASCII bytes before appending to the line buffer. All ASCII (including control characters like `\t` or DEL) passes through to `parse_uart_line`. The parser is robust (returns `Err` on bad field counts or non-numeric values), but malformed input from the machine side can spam `warn!` log entries at up to one per byte if the machine sends garbage continuously.

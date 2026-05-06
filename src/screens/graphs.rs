@@ -13,49 +13,25 @@ pub struct Graphs;
 
 impl Board for Graphs {
     fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
-        let hx_states: Vec<(f64, f64)> = state
-            .machine_state
-            .current_hx_data
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i as f64, v))
-            .collect();
-
-        let curr_boiler_states: Vec<(f64, f64)> = state
-            .machine_state
-            .current_boiler_data
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i as f64, v))
-            .collect();
-
-        let target_boiler_states: Vec<(f64, f64)> = state
-            .machine_state
-            .target_boiler_data
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i as f64, v))
-            .collect();
-
         let datasets = vec![
             Dataset::default()
                 .name("Current")
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Yellow))
                 .graph_type(GraphType::Line)
-                .data(&curr_boiler_states),
+                .data(&state.machine_state.graph_boiler_current),
             Dataset::default()
                 .name("Target")
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Red))
                 .graph_type(GraphType::Line)
-                .data(&target_boiler_states),
+                .data(&state.machine_state.graph_boiler_target),
             Dataset::default()
                 .name("HX")
                 .marker(symbols::Marker::Braille)
                 .style(Style::default().fg(Color::Blue))
                 .graph_type(GraphType::Line)
-                .data(&hx_states),
+                .data(&state.machine_state.graph_hx),
         ];
 
         let chart = Chart::new(datasets)

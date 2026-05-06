@@ -243,6 +243,10 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
                 app.draw(f);
             })
             .unwrap();
+
+        // Yield to the FreeRTOS scheduler so the UART task and Wi-Fi/MQTT stack
+        // get CPU time between render frames.
+        esp_idf_svc::hal::delay::FreeRtos::delay_ms(0);
     }
 }
 

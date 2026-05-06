@@ -156,78 +156,23 @@ impl AppStateMachine {
     pub fn handle_telemetry_frame(state: &mut GlobalAppState, frame: TelemetryFrame, now: Instant) {
         state.enqueue_mqtt_message("telemetry", telemetry_payload(&frame));
 
-        // Update MachineState and get derived events
+        // frame moves into update_state_with_events; it is stored in state.machine_state.last_frame
         let (_snapshot, events) =
-            update_state_with_events(&mut state.machine_state, frame.clone(), now);
+            update_state_with_events(&mut state.machine_state, frame, now);
 
-        if state.machine_state.target_boiler_data.len() > 300 {
-            state.machine_state.target_boiler_data.pop_front();
-            state.machine_state.target_boiler_data.pop_front();
-            state.machine_state.target_boiler_data.pop_front();
-            state.machine_state.current_boiler_data.pop_front();
-            state.machine_state.current_boiler_data.pop_front();
-            state.machine_state.current_boiler_data.pop_front();
-            state.machine_state.current_hx_data.pop_front();
-            state.machine_state.current_hx_data.pop_front();
-            state.machine_state.current_hx_data.pop_front();
-        }
-
-        if let Some(boiler_target_c) = frame.boiler_target_c {
-            state
-                .machine_state
-                .target_boiler_data
-                .push_back(boiler_target_c.into());
-            state
-                .machine_state
-                .target_boiler_data
-                .push_back(boiler_target_c.into());
-            state
-                .machine_state
-                .target_boiler_data
-                .push_back(boiler_target_c.into());
-        } else {
-            state
-                .machine_state
-                .target_boiler_data
-                .push_back(f64::default());
-            state
-                .machine_state
-                .target_boiler_data
-                .push_back(f64::default());
-            state
-                .machine_state
-                .target_boiler_data
-                .push_back(f64::default());
-        }
-        let boiler_now_c = frame.boiler_now_c;
-        state
-            .machine_state
-            .current_boiler_data
-            .push_back(boiler_now_c.into());
-        state
-            .machine_state
-            .current_boiler_data
-            .push_back(boiler_now_c.into());
-        state
-            .machine_state
-            .current_boiler_data
-            .push_back(boiler_now_c.into());
-        let hx_now_c = frame.hx_now_c;
-        state
-            .machine_state
-            .current_hx_data
-            .push_back(hx_now_c.into());
-        state
-            .machine_state
-            .current_hx_data
-            .push_back(hx_now_c.into());
-        state
-            .machine_state
-            .current_hx_data
-            .push_back(hx_now_c.into());
-
-        // Store the latest telemetry frame and record activity time
-        state.machine_state.last_frame = Some(frame);
+        // Extract Copy fields from last_frame before the mutable borrows below
+        let (boiler_target, boiler_now_c, hx_now_c) = {
+            let last = state.machine_state.last_frame.as_ref().unwrap();
+            (
+                last.boiler_target_c.map(f64::from).unwrap_or_default(),
+                f64::from(last.boiler_now_c),
+                f64::from(last.hx_now_c),
+            )
+        };
+        push_triple(&mut state.machine_state.target_boiler_data, boiler_target);
+        push_triple(&mut state.machine_state.current_boiler_data, boiler_now_c);
+        push_triple(&mut state.machine_state.current_hx_data, hx_now_c);
+        state.machine_state.rebuild_graph_points();
         state.last_activity_at = Some(now);
         state.last_uart_frame_at = Some(now);
 
@@ -279,6 +224,19 @@ fn telemetry_payload(frame: &TelemetryFrame) -> String {
             .map(|v| v.to_string())
             .unwrap_or_else(|| "null".to_string())
     )
+}
+
+/// Push `value` three times into `buf`, then trim the oldest triple if the cap is exceeded.
+/// The triple push keeps graph data aligned: each telemetry frame maps to 3 x-axis points,
+/// which smooths the braille-character chart at the Graphs screen's 300-point x bound.
+const GRAPH_BUF_CAP: usize = 300;
+fn push_triple(buf: &mut std::collections::VecDeque<f64>, value: f64) {
+    buf.push_back(value);
+    buf.push_back(value);
+    buf.push_back(value);
+    while buf.len() > GRAPH_BUF_CAP {
+        buf.pop_front();
+    }
 }
 
 fn telemetry_event_payload(event: &crate::telemetry::AppEvent) -> String {
