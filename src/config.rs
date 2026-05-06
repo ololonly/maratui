@@ -73,9 +73,6 @@ impl AppConfig {
         Ok(Self { wifi, mqtt })
     }
 
-    pub fn telemetry_topic(&self) -> String {
-        format!("{}/telemetry", self.mqtt.topic_prefix)
-    }
 }
 
 fn setting(name: &str) -> Option<String> {

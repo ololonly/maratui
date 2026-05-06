@@ -95,19 +95,6 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 
 ---
 
-## Known Bugs / Issues
-
-### 1. `AppConfig::telemetry_topic()` is defined but never called (`src/config.rs:76`)
-Dead method. Remove or use it to replace the inline `format!("{}/telemetry", ...)` in the FSM.
-
-### 5. `is_telemetry_event()` misclassifies infrastructure events (`src/state/app_events.rs:73`)
-`WifiStatusChanged`, `MqttStatusChanged`, `CupCounterUpdated`, and `PublishMqttEvent` are currently in `is_telemetry_event()`'s match arm but are not telemetry events — they're connection/infrastructure events. This causes them to appear in the on-screen event log (`events_log`) unexpectedly.
-
-### 6. Button long-press >2000 ms is silently dropped (`src/button.rs:89`)
-`ButtonState::update` only recognises short (< 500 ms) and long (500–2000 ms). Any press longer than 2000 ms is ignored with no feedback. This is intentional "veto zone" behaviour but is undocumented.
-
----
-
 ## Security Considerations
 
 ### Credentials baked into the binary at compile time
