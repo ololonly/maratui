@@ -26,7 +26,7 @@ impl Board for Dashboard {
     fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         let buf = frame.buffer_mut();
 
-        let Some(t_frame) = state.machine_state.last_frame.clone() else {
+        let Some(t_frame) = state.machine_state.last_frame.as_ref() else {
             return;
         };
 

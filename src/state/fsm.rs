@@ -178,9 +178,8 @@ impl AppStateMachine {
 
         // Process each event through the FSM
         for event in events {
-            let app_event = AppEvent::from_telemetry(event.clone());
-            Self::handle_event(state, app_event);
             let event_payload = telemetry_event_payload(&event);
+            Self::handle_event(state, AppEvent::from_telemetry(event));
             state.enqueue_mqtt_message("events", event_payload);
         }
     }

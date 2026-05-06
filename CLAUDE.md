@@ -93,11 +93,6 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 
 ---
 
-## Known Bottlenecks
-
-### 1. `GlobalAppState` derives `Clone` over ~7 KB of VecDeque data
-`GlobalAppState` derives `Clone` and contains three `VecDeque<f64>` each holding up to 300 elements. An accidental clone (e.g. passing state by value) would silently copy all that heap data. Consider removing the `Clone` impl unless it is intentionally used.
-
 ---
 
 ## Known Bugs / Issues

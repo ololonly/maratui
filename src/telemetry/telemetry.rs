@@ -207,7 +207,7 @@ pub enum AppEvent {
 }
 
 /// Runtime state used to compute derived values (pump duration, transitions).
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MachineState {
     pub on: bool,
     pub last_frame: Option<TelemetryFrame>,

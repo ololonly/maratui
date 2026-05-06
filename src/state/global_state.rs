@@ -91,7 +91,7 @@ impl std::fmt::Display for AppError {
 
 /// Global application state
 /// Single point of state management for the entire application
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct GlobalAppState {
     /// Currently displayed screen
     pub current_screen: Screen,
