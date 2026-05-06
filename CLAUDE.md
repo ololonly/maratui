@@ -101,13 +101,13 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 Wi-Fi SSID/password and MQTT credentials are embedded via `option_env!()` in `build.rs` and stored as plaintext `&'static str` in the flash image. Anyone with physical access and an SPI flash reader can extract them with standard binary analysis tools (`strings`, `binwalk`). **Rotate credentials if the device is shared or its firmware is distributed.**
 
 ### Default MQTT broker is public and unauthenticated
-The default `MARATUI_MQTT_URL=mqtt://broker.emqx.io:1883` publishes machine telemetry to a free public broker with no access control. Any client that knows or guesses the topic prefix (`mara/telemetry`) can read all extraction data. Always set a private broker with authentication before deploying.
+The default `MARATUI_MQTT_URL=mqtt://broker.emqx.io:1883` publishes machine telemetry to a free public broker with no access control. Any client that knows or guesses the topic prefix (`mara/telemetry`) can read all extraction data. Always set a private broker with authentication before deploying. A `warn!` fires on every startup when the default broker is detected.
 
 ### No TLS for MQTT
-The `mqtt://` scheme is plaintext TCP. The `esp-idf-svc` MQTT client supports TLS via `mqtts://` — switch to it and configure a CA certificate for the broker. Until then, credentials and telemetry travel unencrypted on the local network.
+The `mqtt://` scheme is plaintext TCP. The `esp-idf-svc` MQTT client supports TLS via `mqtts://` — switch to it and configure a CA certificate for the broker. Until then, credentials and telemetry travel unencrypted on the local network. A `warn!` fires on startup when credentials are configured over a plaintext connection.
 
 ### Open Wi-Fi fallback
-In `setup.rs:286`, if `wifi_cfg.password` is empty, `AuthMethod::None` is used (open network association). This is intentional for open-network environments but may be surprising — add a config-time log warning when `AuthMethod::None` is selected.
+If `MARATUI_WIFI_PASSWORD` is empty, `AuthMethod::None` is used (open network — no encryption). This is intentional for open-network environments. A `warn!` fires on startup naming the SSID so the choice is explicit in the logs.
 
 ### UART input is not sanitised beyond ASCII gating
 `uart_reader.rs` only rejects non-ASCII bytes before appending to the line buffer. All ASCII (including control characters like `\t` or DEL) passes through to `parse_uart_line`. The parser is robust (returns `Err` on bad field counts or non-numeric values), but malformed input from the machine side can spam `warn!` log entries at up to one per byte if the machine sends garbage continuously.

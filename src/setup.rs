@@ -288,6 +288,10 @@ fn init_networking(
             BlockingWifi::wrap(&mut esp_wifi, sys_loop.clone()).expect("Failed to wrap Wi-Fi");
 
         let auth_method = if wifi_cfg.password.is_empty() {
+            warn!(
+                "MARATUI_WIFI_PASSWORD is empty — connecting to '{}' as an open network (no encryption).",
+                wifi_cfg.ssid
+            );
             AuthMethod::None
         } else {
             AuthMethod::WPA2Personal
