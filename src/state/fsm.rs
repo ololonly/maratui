@@ -157,8 +157,7 @@ impl AppStateMachine {
         state.enqueue_mqtt_message("telemetry", telemetry_payload(&frame));
 
         // frame moves into update_state_with_events; it is stored in state.machine_state.last_frame
-        let (_snapshot, events) =
-            update_state_with_events(&mut state.machine_state, frame, now);
+        let (_snapshot, events) = update_state_with_events(&mut state.machine_state, frame, now);
 
         // Extract Copy fields from last_frame before the mutable borrows below
         let (boiler_target, boiler_now_c, hx_now_c) = {

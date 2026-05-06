@@ -243,16 +243,28 @@ impl MachineState {
     /// Uses clear()+extend() to reuse heap allocation after the first call.
     pub fn rebuild_graph_points(&mut self) {
         self.graph_boiler_current.clear();
-        self.graph_boiler_current
-            .extend(self.current_boiler_data.iter().enumerate().map(|(i, &v)| (i as f64, v)));
+        self.graph_boiler_current.extend(
+            self.current_boiler_data
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64, v)),
+        );
 
         self.graph_boiler_target.clear();
-        self.graph_boiler_target
-            .extend(self.target_boiler_data.iter().enumerate().map(|(i, &v)| (i as f64, v)));
+        self.graph_boiler_target.extend(
+            self.target_boiler_data
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64, v)),
+        );
 
         self.graph_hx.clear();
-        self.graph_hx
-            .extend(self.current_hx_data.iter().enumerate().map(|(i, &v)| (i as f64, v)));
+        self.graph_hx.extend(
+            self.current_hx_data
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64, v)),
+        );
     }
 }
 

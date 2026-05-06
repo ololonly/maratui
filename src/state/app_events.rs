@@ -148,10 +148,22 @@ mod tests {
         assert!(AppEvent::WaterRefillCleared.is_telemetry_event());
 
         // Infrastructure events must NOT appear in the telemetry log
-        assert!(!AppEvent::WifiStatusChanged(crate::state::ConnectionStatus::Connected).is_telemetry_event());
-        assert!(!AppEvent::MqttStatusChanged(crate::state::ConnectionStatus::Connected).is_telemetry_event());
+        assert!(
+            !AppEvent::WifiStatusChanged(crate::state::ConnectionStatus::Connected)
+                .is_telemetry_event()
+        );
+        assert!(
+            !AppEvent::MqttStatusChanged(crate::state::ConnectionStatus::Connected)
+                .is_telemetry_event()
+        );
         assert!(!AppEvent::CupCounterUpdated { cups: 1 }.is_telemetry_event());
-        assert!(!AppEvent::PublishMqttEvent { topic_suffix: "t".into(), payload: "p".into() }.is_telemetry_event());
+        assert!(
+            !AppEvent::PublishMqttEvent {
+                topic_suffix: "t".into(),
+                payload: "p".into()
+            }
+            .is_telemetry_event()
+        );
 
         assert!(AppEvent::NextScreen.is_ui_event());
     }

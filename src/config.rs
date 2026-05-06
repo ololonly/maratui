@@ -99,7 +99,6 @@ impl AppConfig {
             );
         }
     }
-
 }
 
 fn setting(name: &str) -> Option<String> {
