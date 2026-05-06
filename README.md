@@ -25,27 +25,27 @@ MaraTUI provides a multi-screen interface for monitoring and controlling coffee 
 
 ## What's coming
 
-- UI adjustments: lifetime graphs, design improvements, animations
-- Configurable Home Assistant integration (cup count data)
-- MQTT broker integration (telemetry data and events broadcasting)
+- Offline mode using NVS storage
 
 ## Development
 
 ### Configuration (`.env`)
 
-Create a local `.env` file in project root (it is ignored by git):
+Copy `.env.example` to `.env` and fill in your values (the file is git-ignored):
 
 ```bash
-MARATUI_WIFI_SSID=YourWifi
-MARATUI_WIFI_PASSWORD=YourPassword
-
-MARATUI_MQTT_ENABLED=true
-MARATUI_MQTT_URL=mqtt://broker.emqx.io:1883
-MARATUI_MQTT_CLIENT_ID=maratui-dev
-MARATUI_MQTT_USERNAME=
-MARATUI_MQTT_PASSWORD=
-MARATUI_MQTT_TOPIC_PREFIX=mara
+cp .env.example .env
 ```
+
+Key variables:
+
+| Variable | Description |
+|---|---|
+| `MARATUI_WIFI_SSID` / `_PASSWORD` | Wi-Fi credentials (device only) |
+| `MARATUI_MQTT_ENABLED` | Set `true` to enable MQTT publishing |
+| `MARATUI_MQTT_URL` | Broker URL, e.g. `mqtt://192.168.1.x:1883` |
+| `MARATUI_MQTT_CLIENT_ID` | Unique client identifier |
+| `MARATUI_MQTT_TOPIC_PREFIX` | Topic namespace prefix (default: `mara`) |
 
 How it works:
 
@@ -77,6 +77,10 @@ Or use platform-specific cargo aliases directly:
 ### Hardware
 
 See [docs/hardware.md](docs/hardware.md) for ESP32 pinout, display wiring.
+
+### Home Assistant integration
+
+See [docs/home-assistant.md](docs/home-assistant.md) for the Node-RED bridge that maps MaraTUI MQTT topics to HA entities via MQTT Discovery.
 
 ### ESP32 (flash)
 
