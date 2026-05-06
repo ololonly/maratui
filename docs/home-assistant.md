@@ -128,25 +128,6 @@ The flow registers the following entities under a single device named **Lelit Ma
 
 **Handle Events** — runs on every event. Persists `last_extraction_duration` as a retained state, resets the extraction timer to 0 on `shot_started`, and syncs the water-low binary sensor directly from events (more reliable than polling the telemetry field).
 
-## Example HA Automation
-
-Turn on a smart plug 20 minutes before the first shot each morning (requires the **Time Since Last Shot** sensor):
-
-```yaml
-alias: Mara warm-up reminder
-trigger:
-  - platform: time
-    at: "07:40:00"
-condition:
-  - condition: state
-    entity_id: binary_sensor.lelit_mara_pump_active
-    state: "off"
-action:
-  - service: notify.mobile_app_your_phone
-    data:
-      message: "Start the Mara if you want espresso at 8."
-```
-
 ## Troubleshooting
 
 **Entities don't appear in HA**
