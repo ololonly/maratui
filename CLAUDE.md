@@ -34,7 +34,7 @@ Uses `espflash flash --monitor` as the runner (configured in `.cargo/config.toml
 ```bash
 cargo test --no-default-features --features simulator --target x86_64-unknown-linux-gnu
 ```
-Tests live inline in `src/state/fsm.rs` and `src/telemetry/telemetry.rs`.
+Tests live inline in `src/state/fsm.rs`, `src/state/global_state.rs`, `src/state/app_events.rs`, and `src/telemetry/telemetry.rs`.
 
 ## Configuration
 
@@ -90,3 +90,24 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 | Space | Inject no-water debug frame |
 | D | Button1+Button2 (Debug screen) |
 | M | Publish manual MQTT event |
+
+---
+
+---
+
+## Security Considerations
+
+### Credentials baked into the binary at compile time
+Wi-Fi SSID/password and MQTT credentials are embedded via `option_env!()` in `build.rs` and stored as plaintext `&'static str` in the flash image. Anyone with physical access and an SPI flash reader can extract them with standard binary analysis tools (`strings`, `binwalk`). **Rotate credentials if the device is shared or its firmware is distributed.**
+
+### Default MQTT broker is public and unauthenticated
+The default `MARATUI_MQTT_URL=mqtt://broker.emqx.io:1883` publishes machine telemetry to a free public broker with no access control. Any client that knows or guesses the topic prefix (`mara/telemetry`) can read all extraction data. Always set a private broker with authentication before deploying. A `warn!` fires on every startup when the default broker is detected.
+
+### No TLS for MQTT
+The `mqtt://` scheme is plaintext TCP. The `esp-idf-svc` MQTT client supports TLS via `mqtts://` — switch to it and configure a CA certificate for the broker. Until then, credentials and telemetry travel unencrypted on the local network. A `warn!` fires on startup when credentials are configured over a plaintext connection.
+
+### Open Wi-Fi fallback
+If `MARATUI_WIFI_PASSWORD` is empty, `AuthMethod::None` is used (open network — no encryption). This is intentional for open-network environments. A `warn!` fires on startup naming the SSID so the choice is explicit in the logs.
+
+### UART input is not sanitised beyond ASCII gating
+`uart_reader.rs` only rejects non-ASCII bytes before appending to the line buffer. All ASCII (including control characters like `\t` or DEL) passes through to `parse_uart_line`. The parser is robust (returns `Err` on bad field counts or non-numeric values), but malformed input from the machine side can spam `warn!` log entries at up to one per byte if the machine sends garbage continuously.

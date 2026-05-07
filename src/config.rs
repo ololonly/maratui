@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use log::warn;
 
 #[derive(Clone, Debug)]
 pub struct WifiConfig {
@@ -70,11 +71,33 @@ impl AppConfig {
                 .unwrap_or_else(|| "maratui".to_string()),
         };
 
-        Ok(Self { wifi, mqtt })
+        let cfg = Self { wifi, mqtt };
+        cfg.warn_insecure();
+        Ok(cfg)
     }
 
-    pub fn telemetry_topic(&self) -> String {
-        format!("{}/telemetry", self.mqtt.topic_prefix)
+    fn warn_insecure(&self) {
+        // S1: default public broker leaks telemetry to anyone who knows the topic
+        if self.mqtt.url.contains("broker.emqx.io") {
+            warn!(
+                "MQTT is using the default public broker ({}). \
+                 All telemetry is publicly readable. Set MARATUI_MQTT_URL to a private broker.",
+                self.mqtt.url
+            );
+        }
+
+        // S2: credentials sent over plaintext MQTT
+        let is_plaintext = self.mqtt.url.starts_with("mqtt://")
+            || self.mqtt.url.starts_with("tcp://")
+            || self.mqtt.url.starts_with("ws://");
+        let has_credentials = self.mqtt.username.is_some() || self.mqtt.password.is_some();
+        if self.mqtt.enabled && is_plaintext && has_credentials {
+            warn!(
+                "MQTT credentials are being sent over a plaintext connection ({}). \
+                 Switch to mqtts:// to encrypt credentials in transit.",
+                self.mqtt.url
+            );
+        }
     }
 }
 

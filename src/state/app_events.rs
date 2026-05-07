@@ -69,7 +69,8 @@ impl AppEvent {
         }
     }
 
-    /// Check if the event is a telemetry event
+    /// Check if the event is a telemetry event (shot/mode/water transitions from the machine).
+    /// Only these events are written to the on-screen events log.
     pub fn is_telemetry_event(&self) -> bool {
         matches!(
             self,
@@ -78,10 +79,6 @@ impl AppEvent {
                 | AppEvent::ModeChanged { .. }
                 | AppEvent::WaterRefillNeeded { .. }
                 | AppEvent::WaterRefillCleared
-                | AppEvent::WifiStatusChanged(..)
-                | AppEvent::MqttStatusChanged(..)
-                | AppEvent::CupCounterUpdated { .. }
-                | AppEvent::PublishMqttEvent { .. }
         )
     }
 
@@ -146,6 +143,28 @@ mod tests {
     #[test]
     fn test_app_event_is_telemetry_event() {
         assert!(AppEvent::ShotStarted.is_telemetry_event());
+        assert!(AppEvent::ShotEnded { duration: 30 }.is_telemetry_event());
+        assert!(AppEvent::WaterRefillNeeded { code: 65 }.is_telemetry_event());
+        assert!(AppEvent::WaterRefillCleared.is_telemetry_event());
+
+        // Infrastructure events must NOT appear in the telemetry log
+        assert!(
+            !AppEvent::WifiStatusChanged(crate::state::ConnectionStatus::Connected)
+                .is_telemetry_event()
+        );
+        assert!(
+            !AppEvent::MqttStatusChanged(crate::state::ConnectionStatus::Connected)
+                .is_telemetry_event()
+        );
+        assert!(!AppEvent::CupCounterUpdated { cups: 1 }.is_telemetry_event());
+        assert!(
+            !AppEvent::PublishMqttEvent {
+                topic_suffix: "t".into(),
+                payload: "p".into()
+            }
+            .is_telemetry_event()
+        );
+
         assert!(AppEvent::NextScreen.is_ui_event());
     }
 

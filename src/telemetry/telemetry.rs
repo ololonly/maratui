@@ -47,12 +47,12 @@ pub struct TelemetryFrame {
 impl TelemetryFrame {
     pub fn debug_frame() -> Self {
         Self {
-            raw_string: "C1.10,120,138,090,0000,1,0".to_string(),
+            raw_string: "C1.10,122,128,092,0000,1,0".to_string(),
             mode: MachineMode::SteamC,
             sw_version: "1.10".to_string(),
-            boiler_now_c: 120,
-            boiler_target_c: Some(138),
-            hx_now_c: 90,
+            boiler_now_c: 122,
+            boiler_target_c: Some(128),
+            hx_now_c: 92,
             boost_countdown_s: 0,
             heating_on: true,
             pump_on: false,
@@ -207,34 +207,69 @@ pub enum AppEvent {
 }
 
 /// Runtime state used to compute derived values (pump duration, transitions).
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MachineState {
-    pub on: bool,
     pub last_frame: Option<TelemetryFrame>,
     pub last_update: Option<Instant>,
     pub shot_started_at: Option<Instant>,
     pub target_boiler_data: VecDeque<f64>,
     pub current_boiler_data: VecDeque<f64>,
     pub current_hx_data: VecDeque<f64>,
+    /// Pre-computed graph points rebuilt once per telemetry frame.
+    /// The Graphs screen reads these directly to avoid per-render allocations.
+    pub graph_boiler_current: Vec<(f64, f64)>,
+    pub graph_boiler_target: Vec<(f64, f64)>,
+    pub graph_hx: Vec<(f64, f64)>,
 }
 
 impl Default for MachineState {
     fn default() -> Self {
         Self {
-            on: false,
             last_frame: None,
             last_update: None,
             shot_started_at: None,
             target_boiler_data: VecDeque::with_capacity(300),
             current_boiler_data: VecDeque::with_capacity(300),
             current_hx_data: VecDeque::with_capacity(300),
+            graph_boiler_current: Vec::with_capacity(300),
+            graph_boiler_target: Vec::with_capacity(300),
+            graph_hx: Vec::with_capacity(300),
         }
+    }
+}
+
+impl MachineState {
+    /// Rebuild the cached graph point slices from the rolling VecDeque buffers.
+    /// Uses clear()+extend() to reuse heap allocation after the first call.
+    pub fn rebuild_graph_points(&mut self) {
+        self.graph_boiler_current.clear();
+        self.graph_boiler_current.extend(
+            self.current_boiler_data
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64, v)),
+        );
+
+        self.graph_boiler_target.clear();
+        self.graph_boiler_target.extend(
+            self.target_boiler_data
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64, v)),
+        );
+
+        self.graph_hx.clear();
+        self.graph_hx.extend(
+            self.current_hx_data
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64, v)),
+        );
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Snapshot {
-    pub frame: TelemetryFrame,
     pub is_extracting: bool,
 }
 
@@ -298,16 +333,10 @@ pub fn update_state_with_events(
         _ => {}
     }
 
-    // Store the new frame/time
     state.last_update = Some(now);
-    state.last_frame = Some(frame.clone());
-
     let is_extracting = frame.pump_on;
-
-    let snapshot = Snapshot {
-        frame,
-        is_extracting,
-    };
+    state.last_frame = Some(frame);
+    let snapshot = Snapshot { is_extracting };
 
     (snapshot, events)
 }

@@ -9,25 +9,15 @@ use log::{info, warn};
 use std::sync::mpsc::Sender;
 use std::thread;
 
-/// UART reader that continuously reads from UART2 and sends parsed telemetry frames
-/// through a channel.
+const READ_BUF_SIZE: usize = 64;
+const LINE_BUF_MAX: usize = 256;
+
 pub struct UartReader {
     _uart: UartDriver<'static>,
 }
 
 impl UartReader {
-    /// Creates a new UART reader configured for UART2.
-    ///
-    /// # Parameters
-    /// - `uart`: UART2 peripheral
-    /// - `tx_pin`: GPIO pin for TX
-    /// - `rx_pin`: GPIO pin for RX
-    ///
-    /// # Configuration
-    /// - Baudrate: 9600
-    /// - Data bits: 8
-    /// - Stop bits: 1
-    /// - Parity: None
+    /// Creates a new UART reader configured for UART1 at 9600 8N1.
     pub fn new(
         uart: UART1,
         tx_pin: impl Into<AnyIOPin>,
@@ -38,7 +28,6 @@ impl UartReader {
         config.data_bits = DataBits::DataBits8;
         config.parity = Parity::ParityNone;
         config.stop_bits = StopBits::STOP1;
-        // Enable event queue for non-blocking operations
         config.queue_size = 10;
 
         let uart = UartDriver::new(
@@ -53,101 +42,74 @@ impl UartReader {
         Ok(UartReader { _uart: uart })
     }
 
-    /// Spawns a background task that continuously reads from UART, parses lines,
-    /// and sends TelemetryFrame through the channel.
+    /// Spawns a background task that reads UART in bursts, parses complete lines,
+    /// and forwards `TelemetryFrame`s through `tx`.
     ///
-    /// The task will run until the program terminates. Invalid lines are logged
-    /// and ignored.
-    ///
-    /// This method consumes the UartReader, moving the UART driver into the background thread.
+    /// Reads up to `READ_BUF_SIZE` bytes per call instead of one byte at a time,
+    /// reducing syscall overhead from ~27 calls per line to ~1.
     pub fn spawn_uart_task(self, tx: Sender<TelemetryFrame>) -> Result<(), EspError> {
-        // Move UART driver into the thread
         let uart = self._uart;
         info!("About to spawn UART thread - thread::spawn called");
 
         thread::spawn(move || {
-            let uart = uart;
-            let mut line_buffer = String::new();
-            let mut byte_buffer = [0u8; 1];
+            let mut line_buf = String::new();
+            let mut read_buf = [0u8; READ_BUF_SIZE];
 
-            // Force immediate log output
             info!("UART task started - entering loop");
-
-            // Small delay to ensure log is written and task is scheduled
             FreeRtos::delay_ms(100);
 
-            loop {
-                // Check if data is available before reading to avoid blocking
-                // This is a workaround for uart.read() blocking forever
+            'outer: loop {
                 match uart.remaining_read() {
+                    Ok(0) => {
+                        FreeRtos::delay_ms(10);
+                    }
                     Ok(available) => {
-                        if available > 0 {
-                            // Data available - try to read
-                            let read_result = uart.read(&mut byte_buffer, 1000); // 1ms timeout
-
-                            match read_result {
-                                Ok(1) => {
-                                    let byte = byte_buffer[0];
-
-                                    // Check for line endings
-                                    if byte == b'\n' || byte == b'\r' {
-                                        if !line_buffer.is_empty() {
-                                            // Send line through channel (clone because we need to clear buffer after)
-                                            let telemetry = match parse_uart_line(&line_buffer) {
-                                                Ok(t) => t,
-                                                Err(_e) => {
-                                                    warn!("UART parse error: {:?}", line_buffer);
-                                                    continue;
+                        let to_read = available.min(READ_BUF_SIZE);
+                        match uart.read(&mut read_buf[..to_read], 0) {
+                            Ok(0) => {}
+                            Ok(n) => {
+                                for &byte in &read_buf[..n] {
+                                    match byte {
+                                        b'\n' | b'\r' => {
+                                            if !line_buf.is_empty() {
+                                                match parse_uart_line(&line_buf) {
+                                                    Ok(telemetry) => {
+                                                        info!("UART line: '{}'", &line_buf);
+                                                        if tx.send(telemetry).is_err() {
+                                                            warn!("UART channel closed, exiting");
+                                                            break 'outer;
+                                                        }
+                                                    }
+                                                    Err(_) => {
+                                                        warn!("UART parse error: {:?}", line_buf);
+                                                    }
                                                 }
-                                            };
-
-                                            info!("UART line received: '{}'", &line_buffer);
-                                            if tx.send(telemetry).is_err() {
-                                                // Receiver dropped, exit task
-                                                warn!("UART channel closed, exiting");
-                                                break;
+                                                line_buf.clear();
                                             }
-                                            line_buffer.clear();
                                         }
-                                        // Skip \r if followed by \n
-                                        if byte == b'\r' {
-                                            continue;
+                                        _ if byte.is_ascii_graphic()
+                                            || byte == b' '
+                                            || byte == b'\t' =>
+                                        {
+                                            line_buf.push(byte as char);
+                                            if line_buf.len() > LINE_BUF_MAX {
+                                                warn!("UART buffer overflow, clearing");
+                                                line_buf.clear();
+                                            }
                                         }
-                                    } else if byte.is_ascii() || byte == b'\t' {
-                                        // Add printable ASCII or tab to buffer
-                                        line_buffer.push(byte as char);
-
-                                        // Prevent buffer overflow
-                                        if line_buffer.len() > 256 {
-                                            // Buffer overflow - clear to prevent memory issues
-                                            warn!("UART buffer overflow, clearing");
-                                            line_buffer.clear();
+                                        _ => {
+                                            info!("UART non-ASCII byte: 0x{:02x}", byte);
                                         }
-                                    } else {
-                                        // Log non-ASCII bytes
-                                        info!("UART non-ASCII byte: 0x{:02x}", byte);
                                     }
                                 }
-                                Ok(0) => {
-                                    // Timeout - no data available (shouldn't happen if remaining_read > 0)
-                                    // Continue to next iteration
-                                }
-                                Ok(_) => {
-                                    // Should not happen with 1-byte buffer
-                                }
-                                Err(e) => {
-                                    // Read error - log and wait a bit
-                                    warn!("UART read error: {:?}", e);
-                                    FreeRtos::delay_ms(10);
-                                }
                             }
-                        } else {
-                            // No data available - delay to prevent busy-waiting
-                            FreeRtos::delay_ms(10);
+                            Err(e) => {
+                                warn!("UART read error: {:?}", e);
+                                FreeRtos::delay_ms(10);
+                            }
                         }
                     }
                     Err(e) => {
-                        // Error checking remaining_read
                         warn!("UART remaining_read error: {:?}", e);
                         FreeRtos::delay_ms(10);
                     }
@@ -158,7 +120,6 @@ impl UartReader {
         });
 
         info!("UART thread spawn returned successfully");
-        // Give thread time to start and log
         FreeRtos::delay_ms(200);
         info!("UART task spawn command completed");
         Ok(())

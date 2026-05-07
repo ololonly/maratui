@@ -26,7 +26,7 @@ impl Board for Dashboard {
     fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         let buf = frame.buffer_mut();
 
-        let Some(t_frame) = state.machine_state.last_frame.clone() else {
+        let Some(t_frame) = state.machine_state.last_frame.as_ref() else {
             return;
         };
 
@@ -38,8 +38,8 @@ impl Board for Dashboard {
         ])
         .areas(area);
 
-        render_mode_banner(&t_frame, banner_area, buf);
-        render_boiler_gauge(&t_frame, boiler_area, buf);
+        render_mode_banner(t_frame, banner_area, buf);
+        render_boiler_gauge(t_frame, boiler_area, buf);
 
         // rule of thirds: 1 | 3 | 1
         let [info_col, timer_col, gauge_col] = Layout::horizontal([
@@ -49,7 +49,7 @@ impl Board for Dashboard {
         ])
         .areas(content_area);
 
-        render_info_col(&t_frame, info_col, buf);
+        render_info_col(t_frame, info_col, buf);
         render_shot_gauge(state, gauge_col, buf);
         render_timer(state, timer_col, frame);
     }
