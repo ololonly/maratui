@@ -17,7 +17,9 @@ impl Board for Debug {
     fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         let buf = frame.buffer_mut();
 
-        let [net_line, uart_line, log_area] = Layout::vertical([
+        let [net_line, dev_line1, dev_line2, uart_line, log_area] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Min(1),
@@ -28,6 +30,20 @@ impl Board for Debug {
             "NET: Wi-Fi={:?} MQTT={:?}",
             state.wifi_status, state.mqtt_status
         );
+
+        let dev = &state.device_info;
+        let rssi_str = dev
+            .wifi_rssi
+            .map(|v| format!("{}dBm", v))
+            .unwrap_or_else(|| "?".to_string());
+        let ip_str = dev.ip.as_deref().unwrap_or("?");
+        let heap_str = dev
+            .free_heap_b
+            .map(|v| format!("{}kB", v / 1024))
+            .unwrap_or_else(|| "N/A".to_string());
+        // ~45 chars per line at 7px/char on 320px display
+        let dev_text1 = format!("DEV: ssid={} rssi={}", dev.wifi_ssid, rssi_str);
+        let dev_text2 = format!("     ip={} up={}s heap={}", ip_str, dev.uptime_s, heap_str);
 
         let now = Instant::now();
         let activity_marker = match state.last_uart_frame_at {
@@ -43,6 +59,8 @@ impl Board for Debug {
         let lines = state.events_log.iter().map(|s| Line::from(s.to_string()));
 
         Paragraph::new(vec![Line::from(net_text)]).render(net_line, buf);
+        Paragraph::new(vec![Line::from(dev_text1)]).render(dev_line1, buf);
+        Paragraph::new(vec![Line::from(dev_text2)]).render(dev_line2, buf);
         Paragraph::new(vec![Line::from(text)]).render(uart_line, buf);
         Paragraph::new(Text::from_iter(lines)).render(log_area, buf);
     }

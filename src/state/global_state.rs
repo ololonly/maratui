@@ -69,6 +69,16 @@ impl ExtractionState {
     }
 }
 
+/// Board metadata published to MQTT and shown on the Debug screen
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DeviceInfo {
+    pub wifi_ssid: String,
+    pub wifi_rssi: Option<i32>,
+    pub ip: Option<String>,
+    pub uptime_s: u64,
+    pub free_heap_b: Option<u32>,
+}
+
 /// Application errors
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AppError {
@@ -116,6 +126,8 @@ pub struct GlobalAppState {
     pub last_activity_at: Option<Instant>,
     /// Last time a UART telemetry frame was received (for Debug screen activity marker)
     pub last_uart_frame_at: Option<Instant>,
+    /// Board metadata (WiFi RSSI, IP, uptime, free heap)
+    pub device_info: DeviceInfo,
 }
 
 impl Default for GlobalAppState {
@@ -135,6 +147,7 @@ impl Default for GlobalAppState {
             screen_before_debug: None,
             last_activity_at: None,
             last_uart_frame_at: None,
+            device_info: DeviceInfo::default(),
         }
     }
 }
