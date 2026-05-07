@@ -1,7 +1,8 @@
 use log::{error, info};
 
 use super::{
-    AppError, AppEvent, ExtractionState, GlobalAppState, global_state::EXTRACTION_RETURN_DELAY,
+    AppError, AppEvent, DeviceInfo, ExtractionState, GlobalAppState,
+    global_state::EXTRACTION_RETURN_DELAY,
 };
 use crate::button::{Button, ButtonPressType};
 use crate::screens::Screen;
@@ -116,6 +117,12 @@ impl AppStateMachine {
                 payload,
             } => {
                 state.enqueue_mqtt_message(topic_suffix, payload);
+            }
+
+            AppEvent::DeviceInfoUpdated(info) => {
+                let payload = device_status_payload(&info);
+                state.device_info = info;
+                state.enqueue_mqtt_message("status", payload);
             }
         }
     }
@@ -235,6 +242,26 @@ fn push_triple(buf: &mut std::collections::VecDeque<f64>, value: f64) {
     while buf.len() > GRAPH_BUF_CAP {
         buf.pop_front();
     }
+}
+
+fn device_status_payload(info: &DeviceInfo) -> String {
+    let rssi = info
+        .wifi_rssi
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "null".to_string());
+    let ip = info
+        .ip
+        .as_deref()
+        .map(|s| format!("\"{}\"", s))
+        .unwrap_or_else(|| "null".to_string());
+    let heap = info
+        .free_heap_b
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "null".to_string());
+    format!(
+        "{{\"uptime_s\":{},\"wifi_ssid\":\"{}\",\"wifi_rssi\":{},\"ip\":{},\"free_heap_b\":{}}}",
+        info.uptime_s, info.wifi_ssid, rssi, ip, heap,
+    )
 }
 
 fn telemetry_event_payload(event: &crate::telemetry::AppEvent) -> String {

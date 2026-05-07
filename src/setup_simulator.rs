@@ -2,7 +2,7 @@ use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
 use crate::config::AppConfig;
 use crate::screens::Screen;
-use crate::state::{AppEvent, ConnectionStatus};
+use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::Size;
 use mousefood::fonts::*;
@@ -13,7 +13,7 @@ use rumqttc::{Client, Event, MqttOptions, Packet, QoS};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use embedded_graphics_simulator::{
     OutputSettingsBuilder, SimulatorDisplay, SimulatorEvent, Window, sdl2::Keycode,
@@ -59,6 +59,10 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
     } else {
         app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Disabled));
     }
+
+    const STATUS_INTERVAL: Duration = Duration::from_secs(30);
+    let boot_time = Instant::now();
+    let mut last_status_at: Option<Instant> = None;
 
     loop {
         let screen_before = app.current_screen();
@@ -135,6 +139,26 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
             while let Ok(status) = status_rx.try_recv() {
                 app.handle_event(AppEvent::MqttStatusChanged(status));
             }
+        }
+
+        let now = Instant::now();
+        let should_publish_status = last_status_at
+            .map(|t| now.saturating_duration_since(t) >= STATUS_INTERVAL)
+            .unwrap_or(true);
+        if should_publish_status {
+            last_status_at = Some(now);
+            let ssid = app_config
+                .wifi
+                .as_ref()
+                .map(|w| w.ssid.clone())
+                .unwrap_or_else(|| "simulator".to_string());
+            app.handle_event(AppEvent::DeviceInfoUpdated(DeviceInfo {
+                wifi_ssid: ssid,
+                wifi_rssi: Some(-65),
+                ip: Some("127.0.0.1".to_string()),
+                uptime_s: now.saturating_duration_since(boot_time).as_secs(),
+                free_heap_b: None,
+            }));
         }
 
         let (_, mqtt_status) = app.connection_statuses();

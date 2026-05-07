@@ -1,6 +1,6 @@
 use crate::telemetry::AppEvent as TelemetryEvent;
 
-use super::ConnectionStatus;
+use super::{ConnectionStatus, DeviceInfo};
 
 /// Application events
 /// Combines telemetry events and UI events
@@ -55,6 +55,9 @@ pub enum AppEvent {
         topic_suffix: String,
         payload: String,
     },
+
+    /// Board metadata update (WiFi RSSI, IP, uptime, free heap)
+    DeviceInfoUpdated(DeviceInfo),
 }
 
 impl AppEvent {
@@ -125,6 +128,9 @@ impl std::fmt::Display for AppEvent {
                 "Publish MQTT event: suffix='{}' payload='{}'",
                 topic_suffix, payload
             ),
+            AppEvent::DeviceInfoUpdated(info) => {
+                write!(f, "Device info updated (uptime={}s)", info.uptime_s)
+            }
         }
     }
 }

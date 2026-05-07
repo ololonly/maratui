@@ -2,7 +2,7 @@ use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonState};
 use crate::config::AppConfig;
 use crate::screens::Screen;
-use crate::state::{AppEvent, ConnectionStatus};
+use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::Drawable;
 use mousefood::embedded_graphics::image::{Image, ImageRaw, ImageRawBE};
@@ -33,7 +33,7 @@ use esp_idf_svc::wifi::{
 use ili9341::{DisplaySize240x320, Ili9341, Orientation};
 use log::{info, warn};
 use std::sync::mpsc::{self, Receiver};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 type DisplayResult<'a> = anyhow::Result<
     Ili9341<
@@ -139,8 +139,10 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connecting));
     app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));
 
-    let (_wifi, mut mqtt_client, mut cup_counter_rx, mut mqtt_status_rx) =
+    let (_wifi, mut mqtt_client, mut cup_counter_rx, mut mqtt_status_rx, initial_ip) =
         init_networking(modem, &app_config);
+    let boot_time = Instant::now();
+    let mut last_status_at: Option<Instant> = None;
 
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connected));
     if mqtt_client.is_none() {
@@ -226,6 +228,26 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             }
         }
 
+        let now = Instant::now();
+        let should_publish_status = last_status_at
+            .map(|t| now.saturating_duration_since(t) >= STATUS_INTERVAL)
+            .unwrap_or(true);
+        if should_publish_status {
+            last_status_at = Some(now);
+            let ssid = app_config
+                .wifi
+                .as_ref()
+                .map(|w| w.ssid.clone())
+                .unwrap_or_default();
+            app.handle_event(AppEvent::DeviceInfoUpdated(DeviceInfo {
+                wifi_ssid: ssid,
+                wifi_rssi: query_wifi_rssi(),
+                ip: initial_ip.clone(),
+                uptime_s: now.saturating_duration_since(boot_time).as_secs(),
+                free_heap_b: Some(query_free_heap()),
+            }));
+        }
+
         for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
             publish_mqtt_message(&mut mqtt_client, &app_config, &topic_suffix, &payload);
         }
@@ -250,6 +272,21 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     }
 }
 
+const STATUS_INTERVAL: Duration = Duration::from_secs(30);
+
+fn query_wifi_rssi() -> Option<i32> {
+    let mut ap_info: esp_idf_svc::sys::wifi_ap_record_t = unsafe { core::mem::zeroed() };
+    if unsafe { esp_idf_svc::sys::esp_wifi_sta_get_ap_info(&mut ap_info) } == 0 {
+        Some(i32::from(ap_info.rssi))
+    } else {
+        None
+    }
+}
+
+fn query_free_heap() -> u32 {
+    unsafe { esp_idf_svc::sys::esp_get_free_heap_size() }
+}
+
 fn init_networking(
     modem: esp_idf_svc::hal::modem::Modem,
     app_config: &AppConfig,
@@ -258,6 +295,7 @@ fn init_networking(
     Option<EspMqttClient<'static>>,
     Option<Receiver<u64>>,
     Option<Receiver<ConnectionStatus>>,
+    Option<String>,
 ) {
     let sys_loop = EspSystemEventLoop::take().expect("Failed to take system event loop");
     let nvs = EspDefaultNvsPartition::take().ok();
@@ -314,11 +352,16 @@ fn init_networking(
         wifi.wait_netif_up().expect("Failed to obtain IP");
     }
 
-    info!("Wi-Fi connected");
+    let initial_ip = esp_wifi
+        .sta_netif()
+        .get_ip_info()
+        .ok()
+        .map(|info| info.ip.to_string());
+    info!("Wi-Fi connected, IP: {:?}", initial_ip);
 
     if !app_config.mqtt.enabled {
         info!("MQTT is disabled by MARATUI_MQTT_ENABLED");
-        return (Some(esp_wifi), None, None, None);
+        return (Some(esp_wifi), None, None, None, initial_ip);
     }
 
     let cup_counter_topic = format!("{}/cup_counter", app_config.mqtt.topic_prefix);
@@ -391,6 +434,7 @@ fn init_networking(
         Some(mqtt_client),
         Some(cup_counter_rx),
         Some(mqtt_status_rx),
+        initial_ip,
     )
 }
 
