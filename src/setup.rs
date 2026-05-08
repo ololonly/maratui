@@ -4,9 +4,7 @@ use crate::config::AppConfig;
 use crate::screens::Screen;
 use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::telemetry::TelemetryFrame;
-use mousefood::embedded_graphics::Drawable;
-use mousefood::embedded_graphics::image::{Image, ImageRaw, ImageRawBE};
-use mousefood::embedded_graphics::prelude::{DrawTarget, Point, RgbColor};
+use mousefood::embedded_graphics::prelude::{DrawTarget, RgbColor};
 use mousefood::fonts::*;
 use mousefood::prelude::*;
 use ratatui::Terminal;
@@ -99,21 +97,11 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     let button1_pin = peripherals.pins.gpio32;
     let button2_pin = peripherals.pins.gpio19;
 
-    //turn off backlight on idle
-    //turn on when button pressed w/ timeout
     let mut display =
         get_ili9341(spi_p, dc, mosi, sclk, cs, rst).expect("Failed to initialize display");
 
     let mut backlight = PinDriver::output(peripherals.pins.gpio14).unwrap();
     backlight.set_high().unwrap();
-
-    let loading_screen_data = include_bytes!("../assets/loading_screen.raw");
-    let loading_image_raw = ImageRawBE::new(loading_screen_data, 320);
-
-    let loading_image: Image<'_, ImageRaw<'_, Rgb565>> =
-        Image::new(&loading_image_raw, Point::zero());
-
-    loading_image.draw(&mut display).unwrap();
 
     let mut button1 = PinDriver::input(button1_pin).unwrap();
     button1.set_interrupt_type(InterruptType::NegEdge).unwrap();
@@ -133,22 +121,46 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
         ..Default::default()
     };
 
+    // Create the Ratatui terminal first — loading stages render through it
     let backend = EmbeddedBackend::new(&mut display, config);
     let mut terminal = Terminal::new(backend).unwrap();
 
+    // ── WiFi ────────────────────────────────────────────────────────────────
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connecting));
     app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));
+    app.handle_event(AppEvent::LoadingStage {
+        message: "connecting wifi...",
+        progress: 20,
+    });
+    app.render_image(terminal.backend_mut().display_mut());
+    terminal.draw(|f| app.draw(f)).unwrap();
 
-    let (_wifi, mut mqtt_client, mut cup_counter_rx, mut mqtt_status_rx, initial_ip) =
-        init_networking(modem, &app_config);
-    let boot_time = Instant::now();
-    let mut last_status_at: Option<Instant> = None;
-
+    let (_wifi, initial_ip) = init_wifi(modem, &app_config);
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connected));
-    if mqtt_client.is_none() {
+
+    // ── MQTT ────────────────────────────────────────────────────────────────
+    let (mut mqtt_client, mut cup_counter_rx, mut mqtt_status_rx) = if app_config.mqtt.enabled {
+        app.handle_event(AppEvent::LoadingStage {
+            message: "putting on hat...",
+            progress: 55,
+        });
+        app.render_image(terminal.backend_mut().display_mut());
+        terminal.draw(|f| app.draw(f)).unwrap();
+
+        let (client, counter_rx, status_rx) = init_mqtt(&app_config);
+        (Some(client), Some(counter_rx), Some(status_rx))
+    } else {
         app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Disabled));
-    }
-    // MQTT Connected/Connecting status arrives via mqtt_status_rx in the main loop
+        (None, None, None)
+    };
+
+    // ── UART ────────────────────────────────────────────────────────────────
+    app.handle_event(AppEvent::LoadingStage {
+        message: "heating up the machine...",
+        progress: 85,
+    });
+    app.render_image(terminal.backend_mut().display_mut());
+    terminal.draw(|f| app.draw(f)).unwrap();
 
     let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
 
@@ -173,14 +185,11 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
         }
     }
 
-    //Display cleanup before main loop
-    terminal
-        .backend_mut()
-        .display_mut()
-        .clear(Rgb565::BLACK)
-        .unwrap();
+    // Freeze the bar at 100% with "waiting for machine..." until first UART frame
+    app.handle_event(AppEvent::LoadingComplete);
 
-    Ets::delay_ms(100);
+    let boot_time = Instant::now();
+    let mut last_status_at: Option<Instant> = None;
 
     loop {
         let screen_before = app.current_screen();
@@ -287,16 +296,10 @@ fn query_free_heap() -> u32 {
     unsafe { esp_idf_svc::sys::esp_get_free_heap_size() }
 }
 
-fn init_networking(
+fn init_wifi(
     modem: esp_idf_svc::hal::modem::Modem,
     app_config: &AppConfig,
-) -> (
-    Option<EspWifi<'static>>,
-    Option<EspMqttClient<'static>>,
-    Option<Receiver<u64>>,
-    Option<Receiver<ConnectionStatus>>,
-    Option<String>,
-) {
+) -> (EspWifi<'static>, Option<String>) {
     let sys_loop = EspSystemEventLoop::take().expect("Failed to take system event loop");
     let nvs = EspDefaultNvsPartition::take().ok();
 
@@ -321,6 +324,7 @@ fn init_networking(
         EspNetif::new(NetifStack::Ap).expect("Failed to create AP netif"),
     )
     .expect("Failed to create Wi-Fi");
+
     {
         let mut wifi =
             BlockingWifi::wrap(&mut esp_wifi, sys_loop.clone()).expect("Failed to wrap Wi-Fi");
@@ -359,11 +363,16 @@ fn init_networking(
         .map(|info| info.ip.to_string());
     info!("Wi-Fi connected, IP: {:?}", initial_ip);
 
-    if !app_config.mqtt.enabled {
-        info!("MQTT is disabled by MARATUI_MQTT_ENABLED");
-        return (Some(esp_wifi), None, None, None, initial_ip);
-    }
+    (esp_wifi, initial_ip)
+}
 
+fn init_mqtt(
+    app_config: &AppConfig,
+) -> (
+    EspMqttClient<'static>,
+    Receiver<u64>,
+    Receiver<ConnectionStatus>,
+) {
     let cup_counter_topic = format!("{}/cup_counter", app_config.mqtt.topic_prefix);
     let callback_topic = cup_counter_topic.clone();
     let (cup_counter_tx, cup_counter_rx) = mpsc::channel::<u64>();
@@ -429,13 +438,7 @@ fn init_networking(
     }
 
     info!("MQTT started: {}", app_config.mqtt.url);
-    (
-        Some(esp_wifi),
-        Some(mqtt_client),
-        Some(cup_counter_rx),
-        Some(mqtt_status_rx),
-        initial_ip,
-    )
+    (mqtt_client, cup_counter_rx, mqtt_status_rx)
 }
 
 fn publish_mqtt_message(

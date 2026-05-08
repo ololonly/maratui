@@ -60,6 +60,20 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
         app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Disabled));
     }
 
+    // Simulate the loading stages so the loading screen is visible in the simulator
+    let stages: &[(&'static str, u8, u64)] = &[
+        ("connecting wifi...", 20, 800),
+        ("putting on hat...", 55, 600),
+        ("heating up the machine...", 85, 700),
+    ];
+    for &(message, progress, delay_ms) in stages {
+        app.handle_event(AppEvent::LoadingStage { message, progress });
+        app.render_image(terminal.backend_mut().display_mut());
+        terminal.draw(|f| app.draw(f)).unwrap();
+        std::thread::sleep(Duration::from_millis(delay_ms));
+    }
+    app.handle_event(AppEvent::LoadingComplete);
+
     const STATUS_INTERVAL: Duration = Duration::from_secs(30);
     let boot_time = Instant::now();
     let mut last_status_at: Option<Instant> = None;

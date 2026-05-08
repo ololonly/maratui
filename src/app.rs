@@ -136,28 +136,35 @@ impl MaraUiApp for MaraUi {
         D: DrawTarget<Color = Rgb565> + OriginDimensions,
         D::Error: core::fmt::Debug,
     {
-        if self.state.current_screen != Screen::Main {
-            return;
-        }
-        if self.state.machine_state.last_frame.is_none() {
+        // Render rat barista on Main screen (once data arrives) and during connecting/loading
+        let is_main_active = self.state.current_screen == Screen::Main
+            && self.state.machine_state.last_frame.is_some();
+        let is_connecting = self.state.machine_state.last_frame.is_none()
+            && self.state.current_screen != Screen::Debug;
+
+        if !is_main_active && !is_connecting {
             return;
         }
 
-        let image_data: &[u8];
-
-        //Example command to generate the image:
         //ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png -filter_complex "[1:v]scale=180:180[scaled];[0:v][scaled]overlay" -f rawvideo -pix_fmt rgb565be -frames:v 1 rat_barista.raw
-        //ffmpeg -f lavfi -i color=black -i loading_screen.png -filter_complex "[1:v]scale=320:240[scaled];[0:v][scaled]overlay"  -f rawvideo -pix_fmt rgb565be -frames:v 1 loading_screen.raw
-        if let Some(AppError::WaterRefillNeeded { .. }) = self.state.error {
-            image_data = include_bytes!("../assets/rat_barista_thirsty.raw");
+        let image_data: &[u8] = if is_main_active {
+            if let Some(AppError::WaterRefillNeeded { .. }) = self.state.error {
+                include_bytes!("../assets/rat_barista_thirsty.raw")
+            } else {
+                include_bytes!("../assets/rat_barista.raw")
+            }
         } else {
-            image_data = include_bytes!("../assets/rat_barista.raw");
+            include_bytes!("../assets/rat_barista.raw")
+        };
+
+        let mut render_point = Point::new(5, 0);
+
+        if is_connecting {
+            render_point.y = -60;
         }
 
         let image = ImageRawBE::new(image_data, 180);
-
-        let im: Image<'_, ImageRaw<'_, Rgb565>> = Image::new(&image, Point::new(5, 0));
-
+        let im: Image<'_, ImageRaw<'_, Rgb565>> = Image::new(&image, render_point);
         im.draw(display).unwrap();
     }
 }

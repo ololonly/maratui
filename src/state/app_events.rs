@@ -58,6 +58,12 @@ pub enum AppEvent {
 
     /// Board metadata update (WiFi RSSI, IP, uptime, free heap)
     DeviceInfoUpdated(DeviceInfo),
+
+    /// Boot initialization stage — shown on the connecting screen with a progress bar
+    LoadingStage { message: &'static str, progress: u8 },
+
+    /// Boot initialization complete — switches connecting screen to "waiting for machine"
+    LoadingComplete,
 }
 
 impl AppEvent {
@@ -131,6 +137,10 @@ impl std::fmt::Display for AppEvent {
             AppEvent::DeviceInfoUpdated(info) => {
                 write!(f, "Device info updated (uptime={}s)", info.uptime_s)
             }
+            AppEvent::LoadingStage { message, progress } => {
+                write!(f, "Loading [{progress}%]: {message}")
+            }
+            AppEvent::LoadingComplete => write!(f, "Loading complete"),
         }
     }
 }
