@@ -128,7 +128,10 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     // ── WiFi ────────────────────────────────────────────────────────────────
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connecting));
     app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));
-    app.handle_event(AppEvent::LoadingStage { message: "connecting wifi...", progress: 20 });
+    app.handle_event(AppEvent::LoadingStage {
+        message: "connecting wifi...",
+        progress: 20,
+    });
     app.render_image(terminal.backend_mut().display_mut());
     terminal.draw(|f| app.draw(f)).unwrap();
 
@@ -137,7 +140,10 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 
     // ── MQTT ────────────────────────────────────────────────────────────────
     let (mut mqtt_client, mut cup_counter_rx, mut mqtt_status_rx) = if app_config.mqtt.enabled {
-        app.handle_event(AppEvent::LoadingStage { message: "putting on hat...", progress: 55 });
+        app.handle_event(AppEvent::LoadingStage {
+            message: "putting on hat...",
+            progress: 55,
+        });
         app.render_image(terminal.backend_mut().display_mut());
         terminal.draw(|f| app.draw(f)).unwrap();
 
@@ -149,7 +155,10 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     };
 
     // ── UART ────────────────────────────────────────────────────────────────
-    app.handle_event(AppEvent::LoadingStage { message: "heating up the machine...", progress: 85 });
+    app.handle_event(AppEvent::LoadingStage {
+        message: "heating up the machine...",
+        progress: 85,
+    });
     app.render_image(terminal.backend_mut().display_mut());
     terminal.draw(|f| app.draw(f)).unwrap();
 
