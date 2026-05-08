@@ -11,7 +11,6 @@ use ratatui::Terminal;
 use crate::uart_reader::UartReader;
 use display_interface_spi::SPIInterface;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
-use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio27, Gpio33, InterruptType, Output, PinDriver, Pull};
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::spi::{SPI2, SpiConfig, SpiDeviceDriver, SpiDriver};

@@ -28,12 +28,11 @@ Target board: **ESP32 Type-C** (generic) with external **ILI9341** 240x320 TFT d
 | TX       | GPIO17     | UART1 TX |
 | RX       | GPIO16     | UART1 RX, 9600 baud 8N1 |
 
-### Buttons
+### Button
 
 | Button   | ESP32 GPIO | Notes |
 |----------|------------|-------|
 | Button 1 | GPIO32     | Internal pull-up enabled |
-| Button 2 | GPIO19     | Internal pull-up enabled |
 
-Buttons connect GPIO to **GND** through a tactile switch (active LOW, NegEdge detection).
-Short press: < 500 ms. Long press: 500-2000 ms. Both buttons simultaneously: special action.
+Button connects GPIO to **GND** through a tactile switch (active LOW, NegEdge detection).
+Short press (< 500 ms): toggle Dashboard ↔ Graphs. Long press (≥ 500 ms): toggle Debug screen.
