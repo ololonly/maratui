@@ -128,6 +128,8 @@ pub struct GlobalAppState {
     pub last_uart_frame_at: Option<Instant>,
     /// Board metadata (WiFi RSSI, IP, uptime, free heap)
     pub device_info: DeviceInfo,
+    /// Current boot loading stage; `None` before first stage fires, frozen at 100% while waiting for machine
+    pub loading_status: Option<(&'static str, u8)>,
 }
 
 impl Default for GlobalAppState {
@@ -148,6 +150,7 @@ impl Default for GlobalAppState {
             last_activity_at: None,
             last_uart_frame_at: None,
             device_info: DeviceInfo::default(),
+            loading_status: None,
         }
     }
 }

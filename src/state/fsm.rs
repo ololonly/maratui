@@ -124,6 +124,14 @@ impl AppStateMachine {
                 state.device_info = info;
                 state.enqueue_mqtt_message("status", payload);
             }
+
+            AppEvent::LoadingStage { message, progress } => {
+                state.loading_status = Some((message, progress));
+            }
+
+            AppEvent::LoadingComplete => {
+                state.loading_status = Some(("waiting for machine...", 100));
+            }
         }
     }
 
