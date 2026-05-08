@@ -1,7 +1,6 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonState};
 use crate::config::AppConfig;
-use crate::screens::Screen;
 use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::{DrawTarget, RgbColor};
@@ -95,7 +94,6 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     let uart_tx = peripherals.pins.gpio17;
     let uart_rx = peripherals.pins.gpio16;
     let button1_pin = peripherals.pins.gpio32;
-    let button2_pin = peripherals.pins.gpio19;
 
     let mut display =
         get_ili9341(spi_p, dc, mosi, sclk, cs, rst).expect("Failed to initialize display");
@@ -107,12 +105,7 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     button1.set_interrupt_type(InterruptType::NegEdge).unwrap();
     let mut button1_state = ButtonState::default();
 
-    let mut button2 = PinDriver::input(button2_pin).unwrap();
-    button2.set_interrupt_type(InterruptType::NegEdge).unwrap();
-    let mut button2_state = ButtonState::default();
-
     button1.set_pull(Pull::Up).unwrap();
-    button2.set_pull(Pull::Up).unwrap();
 
     let config = EmbeddedBackendConfig {
         font_regular: MONO_7X14,
@@ -190,40 +183,27 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 
     let boot_time = Instant::now();
     let mut last_status_at: Option<Instant> = None;
+    let mut prev_had_telemetry = false;
 
     loop {
-        let screen_before = app.current_screen();
         app.tick();
-        if screen_before == Screen::Main && app.current_screen() != Screen::Main {
+
+        button1_state.update(button1.is_low(), |press_type| {
             terminal.clear().unwrap();
-        }
+            app.handle_press(Button::Button1(press_type));
+        });
 
-        let button1_pressed = button1.is_low();
-        let button2_pressed = button2.is_low();
-
-        if button1_pressed && button2_pressed {
-            terminal.clear().unwrap();
-            app.handle_press(Button::Both);
-            Ets::delay_ms(100);
-        } else {
-            button1_state.update(button1_pressed, |press_type| {
-                terminal.clear().unwrap();
-                app.handle_press(Button::Button1(press_type));
-            });
-
-            button2_state.update(button2_pressed, |press_type| {
-                terminal.clear().unwrap();
-                app.handle_press(Button::Button2(press_type));
-            });
-        }
-
-        let screen_before = app.current_screen();
         while let Ok(telemetry) = rx.try_recv() {
             app.update_telemetry(telemetry);
         }
-        if screen_before == Screen::Main && app.current_screen() != Screen::Main {
+
+        // Clear terminal once when the first UART frame arrives so the loading
+        // screen (rat image + connecting block) is fully overwritten.
+        let now_has_telemetry = app.has_telemetry();
+        if !prev_had_telemetry && now_has_telemetry {
             terminal.clear().unwrap();
         }
+        prev_had_telemetry = now_has_telemetry;
 
         if let Some(cup_counter_rx) = cup_counter_rx.as_mut() {
             while let Ok(cups) = cup_counter_rx.try_recv() {

@@ -1,7 +1,7 @@
 use crate::button::Button;
 use crate::run_app;
-use crate::screens::{Board, Connecting, Dashboard, Debug, Graphs, Rat, Screen};
-use crate::state::{AppError, AppEvent, AppStateMachine, ConnectionStatus, GlobalAppState};
+use crate::screens::{Board, Connecting, Dashboard, Debug, Graphs, Screen};
+use crate::state::{AppEvent, AppStateMachine, ConnectionStatus, GlobalAppState};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::Drawable;
 use mousefood::embedded_graphics::image::{Image, ImageRaw, ImageRawBE};
@@ -40,6 +40,9 @@ pub trait MaraUiApp {
 
     /// Current active screen
     fn current_screen(&self) -> Screen;
+
+    /// Returns `true` once the first UART telemetry frame has arrived
+    fn has_telemetry(&self) -> bool;
 
     fn render_image<D>(&mut self, display: &mut D)
     where
@@ -81,7 +84,6 @@ impl MaraUiApp for MaraUi {
         }
 
         match self.state.current_screen {
-            Screen::Main => Rat::render(&self.state, area, frame),
             Screen::Dashboard => Dashboard::render(&self.state, area, frame),
             Screen::Graphs => Graphs::render(&self.state, area, frame),
             Screen::Debug => Debug::render(&self.state, area, frame),
@@ -124,6 +126,10 @@ impl MaraUiApp for MaraUi {
         self.state.current_screen
     }
 
+    fn has_telemetry(&self) -> bool {
+        self.state.machine_state.last_frame.is_some()
+    }
+
     fn connection_statuses(&self) -> (ConnectionStatus, ConnectionStatus) {
         (
             self.state.wifi_status.clone(),
@@ -136,35 +142,19 @@ impl MaraUiApp for MaraUi {
         D: DrawTarget<Color = Rgb565> + OriginDimensions,
         D::Error: core::fmt::Debug,
     {
-        // Render rat barista on Main screen (once data arrives) and during connecting/loading
-        let is_main_active = self.state.current_screen == Screen::Main
-            && self.state.machine_state.last_frame.is_some();
+        // Render rat barista only during connecting/loading phase
         let is_connecting = self.state.machine_state.last_frame.is_none()
             && self.state.current_screen != Screen::Debug;
 
-        if !is_main_active && !is_connecting {
+        if !is_connecting {
             return;
         }
 
         //ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png -filter_complex "[1:v]scale=180:180[scaled];[0:v][scaled]overlay" -f rawvideo -pix_fmt rgb565be -frames:v 1 rat_barista.raw
-        let image_data: &[u8] = if is_main_active {
-            if let Some(AppError::WaterRefillNeeded { .. }) = self.state.error {
-                include_bytes!("../assets/rat_barista_thirsty.raw")
-            } else {
-                include_bytes!("../assets/rat_barista.raw")
-            }
-        } else {
-            include_bytes!("../assets/rat_barista.raw")
-        };
-
-        let mut render_point = Point::new(5, 0);
-
-        if is_connecting {
-            render_point.y = -60;
-        }
+        let image_data: &[u8] = include_bytes!("../assets/rat_barista.raw");
 
         let image = ImageRawBE::new(image_data, 180);
-        let im: Image<'_, ImageRaw<'_, Rgb565>> = Image::new(&image, render_point);
+        let im: Image<'_, ImageRaw<'_, Rgb565>> = Image::new(&image, Point::new(5, -60));
         im.draw(display).unwrap();
     }
 }

@@ -1,15 +1,12 @@
 use crate::state::GlobalAppState;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use strum::IntoEnumIterator;
 use strum::{Display, EnumIter, FromRepr};
 
 /// Available screens in the application
 #[derive(Clone, Copy, Default, Display, FromRepr, PartialEq, Eq, Debug, EnumIter)]
 pub enum Screen {
     #[default]
-    #[strum(to_string = "Main")]
-    Main,
     #[strum(to_string = "Dashboard")]
     Dashboard,
     #[strum(to_string = "Graphs")]
@@ -19,29 +16,18 @@ pub enum Screen {
 }
 
 impl Screen {
-    fn rotatable() -> Vec<Self> {
-        Screen::iter().filter(|s| *s != Screen::Debug).collect()
-    }
-
-    /// Navigate to the previous screen (wraps around)
-    pub fn previous(self) -> Self {
-        let screens = Self::rotatable();
-        let pos = screens.iter().position(|s| *s == self);
-        match pos {
-            Some(0) => screens[screens.len() - 1],
-            Some(i) => screens[i - 1],
-            None => Screen::Main,
-        }
-    }
-
-    /// Navigate to the next screen (wraps around)
+    /// Toggle between Dashboard and Graphs (single-button navigation)
     pub fn next(self) -> Self {
-        let screens = Self::rotatable();
-        let pos = screens.iter().position(|s| *s == self);
-        match pos {
-            Some(i) => screens[(i + 1) % screens.len()],
-            None => Screen::Main,
+        match self {
+            Screen::Dashboard => Screen::Graphs,
+            Screen::Graphs => Screen::Dashboard,
+            Screen::Debug => Screen::Debug,
         }
+    }
+
+    /// Alias for next — with one button there is no separate "previous"
+    pub fn previous(self) -> Self {
+        self.next()
     }
 }
 

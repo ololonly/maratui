@@ -21,45 +21,25 @@ impl fmt::Display for ButtonPressType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Button {
     Button1(ButtonPressType),
-    Button2(ButtonPressType),
-    Both,
 }
 
 impl fmt::Display for Button {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Button::Button1(press_type) => write!(f, "Button 1 ({press_type})"),
-            Button::Button2(press_type) => write!(f, "Button 2 ({press_type})"),
-            Button::Both => write!(f, "Both Buttons"),
         }
     }
 }
 
 impl Button {
-    /// Check if the button is [`Button::Button1`].
-    pub fn is_button1(&self) -> bool {
-        matches!(self, Button::Button1(_))
-    }
-
-    /// Check if the button is [`Button::Button2`].
-    pub fn is_button2(&self) -> bool {
-        matches!(self, Button::Button2(_))
-    }
-
     /// Check if a short press was detected.
     pub fn is_short_press(&self) -> bool {
-        matches!(
-            self,
-            Button::Button1(ButtonPressType::Short) | Button::Button2(ButtonPressType::Short)
-        )
+        matches!(self, Button::Button1(ButtonPressType::Short))
     }
 
     /// Check if a long press was detected.
     pub fn is_long_press(&self) -> bool {
-        matches!(
-            self,
-            Button::Button1(ButtonPressType::Long) | Button::Button2(ButtonPressType::Long)
-        )
+        matches!(self, Button::Button1(ButtonPressType::Long))
     }
 }
 
