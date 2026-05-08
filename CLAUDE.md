@@ -83,12 +83,11 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 ### Simulator keyboard controls
 | Key | Action |
 |-----|--------|
-| Right arrow | Button1 short (next screen) |
-| Left arrow | Button2 short (prev screen) |
+| Right / Left arrow | Button1 short (toggle Dashboard ↔ Graphs) |
+| D | Button1 long (toggle Debug screen) |
 | Up | Inject pump-on debug frame |
 | Down | Inject normal debug frame |
 | Space | Inject no-water debug frame |
-| D | Button1+Button2 (Debug screen) |
 | M | Publish manual MQTT event |
 
 ---

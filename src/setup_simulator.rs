@@ -1,7 +1,6 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
 use crate::config::AppConfig;
-use crate::screens::Screen;
 use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::Size;
@@ -78,12 +77,10 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
     let boot_time = Instant::now();
     let mut last_status_at: Option<Instant> = None;
 
+    let mut prev_had_telemetry = false;
+
     loop {
-        let screen_before = app.current_screen();
         app.tick();
-        if screen_before == Screen::Main && app.current_screen() != Screen::Main {
-            terminal.clear().unwrap();
-        }
 
         app.render_image(terminal.backend_mut().display_mut());
         terminal
@@ -91,6 +88,13 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                 app.draw(f);
             })
             .unwrap();
+
+        // Clear terminal once when the first UART frame arrives
+        let now_has_telemetry = app.has_telemetry();
+        if !prev_had_telemetry && now_has_telemetry {
+            terminal.clear().unwrap();
+        }
+        prev_had_telemetry = now_has_telemetry;
 
         for event in simulator_window.borrow_mut().events() {
             match event {
@@ -102,32 +106,28 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                         continue;
                     }
                     match keycode {
-                        Keycode::Left => {
-                            terminal.clear().unwrap();
-                            app.handle_press(Button::Button2(ButtonPressType::Short));
-                        }
-                        Keycode::Right => {
+                        Keycode::Right | Keycode::Left => {
                             terminal.clear().unwrap();
                             app.handle_press(Button::Button1(ButtonPressType::Short));
                         }
                         Keycode::Up => {
-                            let prev = app.current_screen();
+                            let had = app.has_telemetry();
                             app.update_telemetry(TelemetryFrame::debug_pump_on_frame());
-                            if prev == Screen::Main && app.current_screen() != Screen::Main {
+                            if !had && app.has_telemetry() {
                                 terminal.clear().unwrap();
                             }
                         }
                         Keycode::Down => {
-                            let prev = app.current_screen();
+                            let had = app.has_telemetry();
                             app.update_telemetry(TelemetryFrame::debug_frame());
-                            if prev == Screen::Main && app.current_screen() != Screen::Main {
+                            if !had && app.has_telemetry() {
                                 terminal.clear().unwrap();
                             }
                         }
                         Keycode::Space => {
-                            let prev = app.current_screen();
+                            let had = app.has_telemetry();
                             app.update_telemetry(TelemetryFrame::debug_no_water_frame());
-                            if prev == Screen::Main && app.current_screen() != Screen::Main {
+                            if !had && app.has_telemetry() {
                                 terminal.clear().unwrap();
                             }
                         }
@@ -139,9 +139,8 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                         }
                         Keycode::D => {
                             terminal.clear().unwrap();
-                            app.handle_press(Button::Both);
+                            app.handle_press(Button::Button1(ButtonPressType::Long));
                         }
-
                         _ => {}
                     }
                 }
