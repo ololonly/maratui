@@ -38,7 +38,11 @@ impl Board for Dashboard {
         ])
         .areas(area);
 
-        render_mode_banner(t_frame, banner_area, buf);
+        let [mode_area, counter_area] =
+            Layout::horizontal(Constraint::from_fills([1, 1])).areas(banner_area);
+
+        render_mode_banner(t_frame, mode_area, buf);
+        render_cup_counter(state.cup_counter, counter_area, buf);
         render_boiler_gauge(t_frame, boiler_area, buf);
 
         // rule of thirds: 1 | 3 | 1
@@ -68,6 +72,17 @@ fn render_mode_banner(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     Paragraph::new(Line::from(label))
         .centered()
         .style(style)
+        .render(area, buf);
+}
+
+fn render_cup_counter(count: Option<u64>, area: Rect, buf: &mut Buffer) {
+    let Some(cups) = count else {
+        return;
+    };
+
+    Paragraph::new(Line::from(format!("Cups brewed: {cups}")))
+        .centered()
+        .style(Style::new().white())
         .render(area, buf);
 }
 
