@@ -139,7 +139,9 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
         app.render_image(terminal.backend_mut().display_mut());
         terminal.draw(|f| app.draw(f)).unwrap();
 
+        let stage_start = Instant::now();
         let (client, counter_rx, status_rx) = init_mqtt(&app_config);
+        min_stage_delay(stage_start);
         (Some(client), Some(counter_rx), Some(status_rx))
     } else {
         app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Disabled));
@@ -154,6 +156,7 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     app.render_image(terminal.backend_mut().display_mut());
     terminal.draw(|f| app.draw(f)).unwrap();
 
+    let stage_start = Instant::now();
     let (tx, rx) = std::sync::mpsc::channel::<TelemetryFrame>();
 
     info!("Initializing UART1: TX=GPIO17, RX=GPIO16, baud=9600");
@@ -176,6 +179,7 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             panic!("UART task spawn failed");
         }
     }
+    min_stage_delay(stage_start);
 
     // Freeze the bar at 100% with "waiting for machine..." until first UART frame
     app.handle_event(AppEvent::LoadingComplete);
@@ -261,6 +265,15 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 }
 
 const STATUS_INTERVAL: Duration = Duration::from_secs(30);
+const MIN_STAGE_MS: u64 = 800;
+
+fn min_stage_delay(started_at: Instant) {
+    let elapsed = started_at.elapsed();
+    let min = Duration::from_millis(MIN_STAGE_MS);
+    if elapsed < min {
+        esp_idf_svc::hal::delay::FreeRtos::delay_ms((min - elapsed).as_millis() as u32);
+    }
+}
 
 fn query_wifi_rssi() -> Option<i32> {
     let mut ap_info: esp_idf_svc::sys::wifi_ap_record_t = unsafe { core::mem::zeroed() };
