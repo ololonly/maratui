@@ -118,8 +118,13 @@ impl MaraUiApp for MaraUi {
     }
 
     fn backlight_active(&self) -> bool {
-        self.state.current_screen == Screen::Debug
-            || self.state.backlight_should_be_on(Instant::now())
+        let is_loading = self.state.machine_state.last_frame.is_none();
+        if is_loading {
+            self.state.current_screen == Screen::Debug || self.state.backlight_on
+        } else {
+            self.state.current_screen == Screen::Debug
+                || self.state.backlight_should_be_on(Instant::now())
+        }
     }
 
     fn current_screen(&self) -> Screen {

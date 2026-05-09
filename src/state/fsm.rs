@@ -140,19 +140,22 @@ impl AppStateMachine {
 
     /// Handle button press events
     pub fn handle_button_press(state: &mut GlobalAppState, button: Button) {
-        state.last_activity_at = Some(Instant::now());
-
-        // Long press always toggles Debug, even before first telemetry arrives.
+        // Long press always toggles Debug, even during loading.
         if let Button::Button1(ButtonPressType::Long) = button {
             Self::handle_event(state, AppEvent::DebugScreen);
             return;
         }
 
-        // Block short-press navigation until the first telemetry frame arrives.
+        // During loading: short press manually toggles the backlight.
         if state.machine_state.last_frame.is_none() {
+            if let Button::Button1(ButtonPressType::Short) = button {
+                state.backlight_on = !state.backlight_on;
+            }
             return;
         }
 
+        // Normal operation after first UART frame arrives.
+        state.last_activity_at = Some(Instant::now());
         if let Button::Button1(ButtonPressType::Short) = button {
             Self::handle_event(state, AppEvent::NextScreen);
         }
@@ -391,6 +394,19 @@ mod tests {
 
         // Screen must not change while no telemetry
         assert_eq!(state.current_screen, initial_screen);
+    }
+
+    #[test]
+    fn test_loading_short_press_toggles_backlight() {
+        let mut state = GlobalAppState::default();
+        assert!(state.machine_state.last_frame.is_none());
+        assert!(state.backlight_on);
+
+        AppStateMachine::handle_button_press(&mut state, Button::Button1(ButtonPressType::Short));
+        assert!(!state.backlight_on);
+
+        AppStateMachine::handle_button_press(&mut state, Button::Button1(ButtonPressType::Short));
+        assert!(state.backlight_on);
     }
 
     #[test]

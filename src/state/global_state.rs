@@ -6,6 +6,8 @@ use std::{
 };
 
 pub const EXTRACTION_RETURN_DELAY: Duration = Duration::from_secs(5);
+// TODO: if the device is powered directly from the espresso machine, the backlight
+// timeout is unnecessary — consider removing BACKLIGHT_TIMEOUT and backlight_should_be_on entirely.
 pub const BACKLIGHT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -122,6 +124,8 @@ pub struct GlobalAppState {
     pub return_to_screen_at: Option<Instant>,
     /// Screen to return to when toggling out of Debug
     pub screen_before_debug: Option<Screen>,
+    /// Backlight toggle during the loading phase (short press on/off); ignored after first UART frame
+    pub backlight_on: bool,
     /// Last time UART telemetry or a button press was received (for backlight timeout)
     pub last_activity_at: Option<Instant>,
     /// Last time a UART telemetry frame was received (for Debug screen activity marker)
@@ -147,6 +151,7 @@ impl Default for GlobalAppState {
             screen_before_extraction: None,
             return_to_screen_at: None,
             screen_before_debug: None,
+            backlight_on: true,
             last_activity_at: None,
             last_uart_frame_at: None,
             device_info: DeviceInfo::default(),
