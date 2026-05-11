@@ -17,12 +17,13 @@ impl Board for Debug {
     fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         let buf = frame.buffer_mut();
 
-        let [net_line, dev_line1, dev_line2, uart_line, log_area] = Layout::vertical([
+        let [net_line, dev_line1, dev_line2, uart_line, log_area, hint_line] = Layout::vertical([
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Min(1),
+            Constraint::Length(1),
         ])
         .areas(area);
 
@@ -63,5 +64,6 @@ impl Board for Debug {
         Paragraph::new(vec![Line::from(dev_text2)]).render(dev_line2, buf);
         Paragraph::new(vec![Line::from(text)]).render(uart_line, buf);
         Paragraph::new(Text::from_iter(lines)).render(log_area, buf);
+        Paragraph::new(vec![Line::from("Long press to exit debug screen")]).render(hint_line, buf);
     }
 }

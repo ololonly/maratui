@@ -1,6 +1,7 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonState};
 use crate::config::AppConfig;
+use crate::screens::Screen;
 use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::{DrawTarget, RgbColor};
@@ -192,8 +193,11 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
         app.tick();
 
         button1_state.update(button1.is_low(), |press_type| {
-            terminal.clear().unwrap();
+            let was_on_loading = !app.has_telemetry() && app.current_screen() != Screen::Debug;
             app.handle_press(Button::Button1(press_type));
+            if was_on_loading && app.current_screen() == Screen::Debug {
+                terminal.clear().unwrap();
+            }
         });
 
         while let Ok(telemetry) = rx.try_recv() {
