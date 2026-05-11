@@ -385,12 +385,11 @@ fn shot_style(secs: u64, is_live: bool) -> Style {
 
 fn shot_quality_label(secs: u64) -> &'static str {
     match secs {
-        0..=14 => "FAST FLOW",
         15..=19 => "UNDEREXTRACTED",
-        20..=24 => "GOOD",
-        25..=27 => "PERFECT",
-        28..=30 => "LONG SHOT",
-        31..=39 => "BLONDING",
-        _ => "OVEREXTRACTED",
+        20..=22 => "GOOD",
+        24..=27 => "PERFECT",
+        28..=31 => "LONG SHOT",
+        32..=39 => "BLONDING",
+        _ => "WTF YOU'RE DOUING?",
     }
 }
