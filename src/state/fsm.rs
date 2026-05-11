@@ -162,10 +162,18 @@ impl AppStateMachine {
                 f64::from(last.hx_now_c),
             )
         };
-        push_triple(&mut state.machine_state.target_boiler_data, boiler_target);
-        push_triple(&mut state.machine_state.current_boiler_data, boiler_now_c);
-        push_triple(&mut state.machine_state.current_hx_data, hx_now_c);
-        state.machine_state.rebuild_graph_points();
+        let should_sample = state
+            .machine_state
+            .last_graph_sample_at
+            .map(|t| now.saturating_duration_since(t) >= GRAPH_SAMPLE_INTERVAL)
+            .unwrap_or(true);
+        if should_sample {
+            state.machine_state.last_graph_sample_at = Some(now);
+            push_sample(&mut state.machine_state.target_boiler_data, boiler_target);
+            push_sample(&mut state.machine_state.current_boiler_data, boiler_now_c);
+            push_sample(&mut state.machine_state.current_hx_data, hx_now_c);
+            state.machine_state.rebuild_graph_points();
+        }
         state.last_activity_at = Some(now);
         state.last_uart_frame_at = Some(now);
 
@@ -206,15 +214,13 @@ fn telemetry_payload(frame: &TelemetryFrame) -> String {
     )
 }
 
-/// Push `value` three times into `buf`, then trim the oldest triple if the cap is exceeded.
-/// The triple push keeps graph data aligned: each telemetry frame maps to 3 x-axis points,
-/// which smooths the braille-character chart at the Graphs screen's 300-point x bound.
+/// One sample per second; 300 samples = 5-minute window shown on the Graphs screen.
 const GRAPH_BUF_CAP: usize = 300;
-fn push_triple(buf: &mut std::collections::VecDeque<f64>, value: f64) {
+const GRAPH_SAMPLE_INTERVAL: Duration = Duration::from_secs(1);
+
+fn push_sample(buf: &mut std::collections::VecDeque<f64>, value: f64) {
     buf.push_back(value);
-    buf.push_back(value);
-    buf.push_back(value);
-    while buf.len() > GRAPH_BUF_CAP {
+    if buf.len() > GRAPH_BUF_CAP {
         buf.pop_front();
     }
 }
