@@ -113,10 +113,6 @@ impl MaraUiApp for MaraUi {
             .collect()
     }
 
-    fn tick(&mut self) {
-        AppStateMachine::tick(&mut self.state, Instant::now());
-    }
-
     fn backlight_active(&self) -> bool {
         let is_loading = self.state.machine_state.last_frame.is_none();
         if is_loading {

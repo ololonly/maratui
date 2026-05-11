@@ -5,7 +5,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub const EXTRACTION_RETURN_DELAY: Duration = Duration::from_secs(5);
 // TODO: if the device is powered directly from the espresso machine, the backlight
 // timeout is unnecessary — consider removing BACKLIGHT_TIMEOUT and backlight_should_be_on entirely.
 pub const BACKLIGHT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -118,10 +117,6 @@ pub struct GlobalAppState {
     pub outbound_mqtt: VecDeque<MqttOutboundMessage>,
     /// Current error (if any)
     pub error: Option<AppError>,
-    /// Screen to return to after extraction cooldown
-    pub screen_before_extraction: Option<Screen>,
-    /// When to auto-return to `screen_before_extraction`
-    pub return_to_screen_at: Option<Instant>,
     /// Screen to return to when toggling out of Debug
     pub screen_before_debug: Option<Screen>,
     /// Backlight toggle during the loading phase (short press on/off); ignored after first UART frame
@@ -148,8 +143,6 @@ impl Default for GlobalAppState {
             cup_counter: None,
             outbound_mqtt: VecDeque::with_capacity(32),
             error: None,
-            screen_before_extraction: None,
-            return_to_screen_at: None,
             screen_before_debug: None,
             backlight_on: true,
             last_activity_at: None,

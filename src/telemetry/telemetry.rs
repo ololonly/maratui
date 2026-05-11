@@ -186,6 +186,8 @@ fn parse_bool01(s: &str, field: &'static str) -> Result<bool, ParseError> {
     }
 }
 
+const MIN_SHOT_SECS: u64 = 15;
+
 /// High-level events derived from telemetry stream.
 /// These are perfect triggers for MQTT "events" topics and for UI notifications.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,6 +197,9 @@ pub enum AppEvent {
 
     /// Pump transitioned from ON -> OFF, with total ON duration.
     ShotEnded { duration: u64 },
+
+    /// Pump ran for less than MIN_SHOT_SECS (rinsing / post-heat pump kick).
+    ShotAborted { duration: u64 },
 
     /// No-water condition appeared (None -> Some(code)) or code changed.
     WaterRefillNeeded { code: u16 },
@@ -310,13 +315,16 @@ pub fn update_state_with_events(
             // Shot continues
         }
         (true, false) => {
-            // Shot ended
             let duration = state
                 .shot_started_at
                 .map(|started_at| now.saturating_duration_since(started_at).as_secs())
                 .unwrap_or(0);
             state.shot_started_at = None;
-            events.push(AppEvent::ShotEnded { duration });
+            if duration < MIN_SHOT_SECS {
+                events.push(AppEvent::ShotAborted { duration });
+            } else {
+                events.push(AppEvent::ShotEnded { duration });
+            }
         }
         (false, false) => {
             // No shot
@@ -371,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn events_shot_start_and_end() {
+    fn events_short_shot_aborted() {
         let mut st = MachineState::default();
         let t0 = Instant::now();
 
@@ -383,13 +391,26 @@ mod tests {
         let (_s1, e1) = update_state_with_events(&mut st, on, t0 + Duration::from_millis(200));
         assert_eq!(e1, vec![AppEvent::ShotStarted]);
 
-        let on2 = parse_uart_line("C1.10,038,138,035,0000,1,1").unwrap();
-        let (_s2, e2) = update_state_with_events(&mut st, on2, t0 + Duration::from_secs(2));
-        assert!(e2.is_empty());
+        let off2 = parse_uart_line("C1.10,039,138,035,0000,1,0").unwrap();
+        let (_s2, e2) = update_state_with_events(&mut st, off2, t0 + Duration::from_secs(10));
+        assert_eq!(e2, vec![AppEvent::ShotAborted { duration: 9 }]);
+    }
+
+    #[test]
+    fn events_long_shot_ended() {
+        let mut st = MachineState::default();
+        let t0 = Instant::now();
+
+        let off = parse_uart_line("C1.10,037,138,035,0000,1,0").unwrap();
+        update_state_with_events(&mut st, off, t0);
+
+        let on = parse_uart_line("C1.10,037,138,035,0000,1,1").unwrap();
+        let (_s1, e1) = update_state_with_events(&mut st, on, t0 + Duration::from_millis(200));
+        assert_eq!(e1, vec![AppEvent::ShotStarted]);
 
         let off2 = parse_uart_line("C1.10,039,138,035,0000,1,0").unwrap();
-        let (_s3, e3) = update_state_with_events(&mut st, off2, t0 + Duration::from_secs(3));
-        assert_eq!(e3, vec![AppEvent::ShotEnded { duration: 2 }]);
+        let (_s2, e2) = update_state_with_events(&mut st, off2, t0 + Duration::from_secs(30));
+        assert_eq!(e2, vec![AppEvent::ShotEnded { duration: 29 }]);
     }
 
     #[test]

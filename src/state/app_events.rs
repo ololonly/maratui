@@ -89,6 +89,7 @@ impl AppEvent {
             self,
             AppEvent::ShotStarted
                 | AppEvent::ShotEnded { .. }
+                | AppEvent::ShotAborted { .. }
                 | AppEvent::ModeChanged { .. }
                 | AppEvent::WaterRefillNeeded { .. }
                 | AppEvent::WaterRefillCleared
@@ -115,6 +116,9 @@ impl std::fmt::Display for AppEvent {
             AppEvent::ShotStarted => write!(f, "Shot Started"),
             AppEvent::ShotEnded { duration } => {
                 write!(f, "Shot Ended ({} s)", duration)
+            }
+            AppEvent::ShotAborted { duration } => {
+                write!(f, "Shot Aborted ({} s)", duration)
             }
             AppEvent::ModeChanged { from, to } => {
                 write!(f, "Mode Changed: {} → {}", from, to)
@@ -165,6 +169,7 @@ mod tests {
     fn test_app_event_is_telemetry_event() {
         assert!(AppEvent::ShotStarted.is_telemetry_event());
         assert!(AppEvent::ShotEnded { duration: 30 }.is_telemetry_event());
+        assert!(AppEvent::ShotAborted { duration: 5 }.is_telemetry_event());
         assert!(AppEvent::WaterRefillNeeded { code: 65 }.is_telemetry_event());
         assert!(AppEvent::WaterRefillCleared.is_telemetry_event());
 

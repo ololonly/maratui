@@ -1,9 +1,6 @@
 use log::{error, info};
 
-use super::{
-    AppError, AppEvent, DeviceInfo, ExtractionState, GlobalAppState,
-    global_state::EXTRACTION_RETURN_DELAY,
-};
+use super::{AppError, AppEvent, DeviceInfo, ExtractionState, GlobalAppState};
 use crate::button::{Button, ButtonPressType};
 use crate::screens::Screen;
 use crate::telemetry::{TelemetryFrame, update_state_with_events};
@@ -30,26 +27,19 @@ impl AppStateMachine {
                 state.extraction_state = ExtractionState::Extracting {
                     started_at: Instant::now(),
                 };
-                // Clear error when extraction starts
                 state.error = None;
-                // Auto-switch to Dashboard and remember where to return
-                if state.current_screen != Screen::Dashboard
-                    && state.current_screen != Screen::Debug
-                {
-                    state.screen_before_extraction = Some(state.current_screen);
-                    state.return_to_screen_at = None;
-                    state.current_screen = Screen::Dashboard;
-                }
             }
 
             AppEvent::ShotEnded { duration } => {
                 state.extraction_state = ExtractionState::Idle {
                     last_extraction_duration: Some(Duration::from_secs(duration)),
                 };
-                // Schedule return to the previous screen after the cooldown
-                if state.screen_before_extraction.is_some() {
-                    state.return_to_screen_at = Some(Instant::now() + EXTRACTION_RETURN_DELAY);
-                }
+            }
+
+            AppEvent::ShotAborted { .. } => {
+                state.extraction_state = ExtractionState::Idle {
+                    last_extraction_duration: None,
+                };
             }
 
             AppEvent::ModeChanged { from: _, to: _ } => {
@@ -68,19 +58,14 @@ impl AppStateMachine {
             // ===== UI Events =====
             AppEvent::NextScreen => {
                 state.current_screen = state.current_screen.next();
-                state.screen_before_extraction = None;
-                state.return_to_screen_at = None;
             }
 
             AppEvent::PreviousScreen => {
                 state.current_screen = state.current_screen.previous();
-                state.screen_before_extraction = None;
-                state.return_to_screen_at = None;
             }
 
             AppEvent::DebugScreen => {
                 if state.current_screen == Screen::Debug {
-                    // Toggle back to the screen we came from
                     state.current_screen = state
                         .screen_before_debug
                         .take()
@@ -88,8 +73,6 @@ impl AppStateMachine {
                 } else {
                     state.screen_before_debug = Some(state.current_screen);
                     state.current_screen = Screen::Debug;
-                    state.screen_before_extraction = None;
-                    state.return_to_screen_at = None;
                 }
             }
 
@@ -199,17 +182,6 @@ impl AppStateMachine {
         }
     }
 
-    /// Check time-based transitions (call once per main loop iteration)
-    pub fn tick(state: &mut GlobalAppState, now: Instant) {
-        if let Some(return_at) = state.return_to_screen_at
-            && now >= return_at
-        {
-            if let Some(screen) = state.screen_before_extraction.take() {
-                state.current_screen = screen;
-            }
-            state.return_to_screen_at = None;
-        }
-    }
 }
 
 fn telemetry_payload(frame: &TelemetryFrame) -> String {
@@ -271,6 +243,9 @@ fn telemetry_event_payload(event: &crate::telemetry::AppEvent) -> String {
         crate::telemetry::AppEvent::ShotStarted => "{\"type\":\"shot_started\"}".to_string(),
         crate::telemetry::AppEvent::ShotEnded { duration } => {
             format!("{{\"type\":\"shot_ended\",\"duration\":{}}}", duration)
+        }
+        crate::telemetry::AppEvent::ShotAborted { duration } => {
+            format!("{{\"type\":\"shot_aborted\",\"duration\":{}}}", duration)
         }
         crate::telemetry::AppEvent::WaterRefillNeeded { code } => {
             format!("{{\"type\":\"water_refill_needed\",\"code\":{}}}", code)
@@ -478,59 +453,20 @@ mod tests {
     }
 
     #[test]
-    fn test_shot_started_switches_to_dashboard() {
+    fn test_shot_aborted_resets_timer() {
         let mut state = GlobalAppState::default();
-        state.current_screen = Screen::Graphs;
 
-        AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
-
-        assert_eq!(state.current_screen, Screen::Dashboard);
-        assert_eq!(state.screen_before_extraction, Some(Screen::Graphs));
-        assert!(state.return_to_screen_at.is_none());
-    }
-
-    #[test]
-    fn test_shot_started_from_dashboard_does_not_save_dashboard() {
-        let mut state = GlobalAppState::default();
-        state.current_screen = Screen::Dashboard;
-
-        AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
-
-        assert_eq!(state.current_screen, Screen::Dashboard);
-        assert_eq!(state.screen_before_extraction, None);
-    }
-
-    #[test]
-    fn test_shot_ended_schedules_return() {
-        let mut state = GlobalAppState::default();
-        state.current_screen = Screen::Graphs;
+        // Simulate a previous real shot
         AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
         AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded { duration: 30 });
+        assert!(state.extraction_state.last_extraction_duration().is_some());
 
-        assert!(state.return_to_screen_at.is_some());
-    }
-
-    #[test]
-    fn test_tick_returns_to_saved_screen_after_delay() {
-        let mut state = GlobalAppState::default();
-        state.current_screen = Screen::Graphs;
+        // Short pump run — must not overwrite last_extraction_duration
         AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
-        AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded { duration: 30 });
+        AppStateMachine::handle_event(&mut state, AppEvent::ShotAborted { duration: 8 });
 
-        assert_eq!(state.current_screen, Screen::Dashboard);
-
-        // Tick before the delay — should stay on Dashboard
-        AppStateMachine::tick(&mut state, Instant::now());
-        assert_eq!(state.current_screen, Screen::Dashboard);
-
-        // Tick after the delay has elapsed
-        let past = Instant::now() - EXTRACTION_RETURN_DELAY - Duration::from_millis(1);
-        state.return_to_screen_at = Some(past);
-        AppStateMachine::tick(&mut state, Instant::now());
-
-        assert_eq!(state.current_screen, Screen::Graphs);
-        assert!(state.screen_before_extraction.is_none());
-        assert!(state.return_to_screen_at.is_none());
+        assert!(!state.extraction_state.is_extracting());
+        assert_eq!(state.extraction_state.last_extraction_duration(), None);
     }
 
     #[test]
@@ -557,18 +493,4 @@ mod tests {
         assert_eq!(state.current_screen, Screen::Dashboard);
     }
 
-    #[test]
-    fn test_manual_navigation_cancels_return() {
-        let mut state = GlobalAppState::default();
-        state.current_screen = Screen::Graphs;
-        AppStateMachine::handle_event(&mut state, AppEvent::ShotStarted);
-        AppStateMachine::handle_event(&mut state, AppEvent::ShotEnded { duration: 30 });
-
-        assert!(state.return_to_screen_at.is_some());
-
-        AppStateMachine::handle_event(&mut state, AppEvent::NextScreen);
-
-        assert!(state.screen_before_extraction.is_none());
-        assert!(state.return_to_screen_at.is_none());
-    }
 }
