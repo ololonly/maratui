@@ -13,6 +13,9 @@ pub enum AppEvent {
     /// Pump turned off, extraction ended
     ShotEnded { duration: u64 },
 
+    /// Pump ran for less than the minimum shot duration (rinsing / post-heat pump kick)
+    ShotAborted { duration: u64 },
+
     /// Machine mode changed
     ModeChanged {
         from: crate::telemetry::MachineMode,
@@ -72,6 +75,7 @@ impl AppEvent {
         match event {
             TelemetryEvent::ShotStarted => AppEvent::ShotStarted,
             TelemetryEvent::ShotEnded { duration } => AppEvent::ShotEnded { duration },
+            TelemetryEvent::ShotAborted { duration } => AppEvent::ShotAborted { duration },
             TelemetryEvent::ModeChanged { from, to } => AppEvent::ModeChanged { from, to },
             TelemetryEvent::WaterRefillNeeded { code } => AppEvent::WaterRefillNeeded { code },
             TelemetryEvent::WaterRefillCleared => AppEvent::WaterRefillCleared,
@@ -88,6 +92,7 @@ impl AppEvent {
                 | AppEvent::ModeChanged { .. }
                 | AppEvent::WaterRefillNeeded { .. }
                 | AppEvent::WaterRefillCleared
+                | AppEvent::CupCounterUpdated { .. }
         )
     }
 
@@ -172,7 +177,7 @@ mod tests {
             !AppEvent::MqttStatusChanged(crate::state::ConnectionStatus::Connected)
                 .is_telemetry_event()
         );
-        assert!(!AppEvent::CupCounterUpdated { cups: 1 }.is_telemetry_event());
+        assert!(AppEvent::CupCounterUpdated { cups: 1 }.is_telemetry_event());
         assert!(
             !AppEvent::PublishMqttEvent {
                 topic_suffix: "t".into(),
