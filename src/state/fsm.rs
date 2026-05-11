@@ -181,7 +181,6 @@ impl AppStateMachine {
             Self::handle_event(state, event);
         }
     }
-
 }
 
 fn telemetry_payload(frame: &TelemetryFrame) -> String {
@@ -492,5 +491,4 @@ mod tests {
         AppStateMachine::handle_event(&mut state, AppEvent::DebugScreen);
         assert_eq!(state.current_screen, Screen::Dashboard);
     }
-
 }
