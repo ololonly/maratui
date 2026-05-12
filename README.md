@@ -9,19 +9,51 @@
 
 # MaraTUI
 
-A TUI (Terminal User Interface) application for embedded systems, built with Rust and Ratatui. Designed to display telemetry data and control interface for the **Lelit Mara** coffee machine.
+A TUI (Terminal User Interface) application for embedded systems, built with Rust and Ratatui. Designed to display telemetry data and control interface for the **Lelit Mara** espresso machine.
 
-## What it does
+## Screens
 
-MaraTUI provides a multi-screen interface for monitoring and controlling coffee machine parameters:
+Navigation cycles between two main screens with a single button press. The Debug screen is a hidden overlay.
 
-- **Main Screen**: System status with visual display
-- **Dashboard**: Real-time telemetry (temperatures, heating, pump status)
-- **Graphs**: Temperature charts and data visualization
-- **Debug**: UART communication monitoring
-- Real-time telemetry parsing from UART
-- Interactive button controls for navigation
-- Embedded display support (ESP32)
+### Dashboard (default)
+
+The primary screen. Shows all real-time machine data:
+
+- **Mode banner** — COFFEE / STEAM / OFFLINE, color-coded
+- **Boiler gauge** — current vs. target temperature with warm→ready color zones and target marker
+- **HX column** — heat-exchanger temperature with a vertical mini-gauge; ideal zone (90–95°C) is always visible
+- **HEAT / PUMP indicators** — live status dots
+- **Extraction timer** — large countdown in seconds (BigText), color shifts white→green→yellow as the shot progresses
+- **Shot quality label** — post-extraction assessment (UNDEREXTRACTED / GOOD / PERFECT / LONG SHOT / BLONDING) shown after the pump stops
+- **Cup counter** — total shots brewed, received via MQTT
+
+### Graphs
+
+Temperature history chart over a **5-minute rolling window** sampled at 1 Hz:
+
+- **Current** boiler temperature (yellow)
+- **Target** boiler temperature (red)
+- **HX** temperature (blue)
+
+### Debug (hidden overlay)
+
+Accessible only via long press. Shows:
+
+- Wi-Fi and MQTT connection statuses
+- Device info: SSID, RSSI, IP address, uptime, free heap
+- Live raw UART frame with activity flash indicator (●)
+- Last 10 telemetry events log
+- Hint: *Long press to exit debug screen*
+
+## Navigation
+
+There is a single physical button (Button1).
+
+| Press | Action |
+|-------|--------|
+| Short | Toggle Dashboard ↔ Graphs |
+| Short (during loading) | Toggle display backlight |
+| Long | Enter / exit Debug overlay |
 
 ## What's coming
 
@@ -64,8 +96,6 @@ Then run the simulator with auto-detected platform target:
 make sim
 ```
 
-Keyboard controls in simulator can emit debug telemetry, which is published to MQTT (if enabled).
-
 Or use platform-specific cargo aliases directly:
 
 | OS      | Command        |
@@ -73,6 +103,17 @@ Or use platform-specific cargo aliases directly:
 | Linux   | `cargo sim`    |
 | macOS   | `cargo simmac` |
 | Windows | `cargo simwin` |
+
+Keyboard controls in the simulator:
+
+| Key | Action |
+|-----|--------|
+| Right / Left | Toggle Dashboard ↔ Graphs |
+| D | Toggle Debug overlay |
+| Up | Inject pump-on debug frame |
+| Down | Inject normal debug frame |
+| Space | Inject no-water debug frame |
+| M | Publish manual MQTT event |
 
 ### Hardware
 
@@ -88,11 +129,13 @@ See [docs/home-assistant.md](docs/home-assistant.md) for the Node-RED bridge tha
 cargo run --release
 ```
 
-On device startup the app now:
+On device startup the app:
 
 1. Reads config from `MARATUI_*` env values (embedded at build time)
 2. Connects to Wi‑Fi
 3. Starts MQTT client
 4. Publishes telemetry frames to `<MARATUI_MQTT_TOPIC_PREFIX>/telemetry`
+5. Publishes telemetry events (shot start/end, water refill, mode change) to `<MARATUI_MQTT_TOPIC_PREFIX>/events`
+6. Publishes device status (IP, RSSI, uptime, heap) to `<MARATUI_MQTT_TOPIC_PREFIX>/status`
 
 > Note: current `esp-idf-svc` MQTT API in this project exposes MQTT 3.1 / 3.1.1 protocol selection; the implementation uses 3.1.1.
