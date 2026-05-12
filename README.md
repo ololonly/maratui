@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="assets/rat_barista_full.png" alt="Rat Chef">
+    <img src="assets/docs/rat_barista_full.png" alt="MaraTUI loading screen">
     <br>
     <br>
     <a href="https://github.com/ratatui/ratatui">
@@ -44,6 +44,12 @@ Accessible only via long press. Shows:
 - Live raw UART frame with activity flash indicator (●)
 - Last 10 telemetry events log
 - Hint: *Long press to exit debug screen*
+
+## Screenshots
+
+| Loading | Dashboard | Debug |
+|---------|-----------|-------|
+| ![Loading](assets/docs/loading_screen.png) | ![Dashboard](assets/docs/extraction_screen.png) | ![Debug](assets/docs/debug_screen.png) |
 
 ## Navigation
 
