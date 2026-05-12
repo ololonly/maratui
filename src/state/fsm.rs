@@ -139,10 +139,10 @@ impl AppStateMachine {
 
         // Normal operation after first UART frame arrives.
         state.last_activity_at = Some(Instant::now());
-        if let Button::Button1(ButtonPressType::Short) = button {
-            if state.current_screen != Screen::Debug {
-                Self::handle_event(state, AppEvent::NextScreen);
-            }
+        if let Button::Button1(ButtonPressType::Short) = button
+            && state.current_screen != Screen::Debug
+        {
+            Self::handle_event(state, AppEvent::NextScreen);
         }
     }
 

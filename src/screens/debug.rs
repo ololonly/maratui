@@ -17,7 +17,14 @@ impl Board for Debug {
     fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
         let buf = frame.buffer_mut();
 
-        let [net_line, dev_line1, dev_line2, uart_line, log_area, hint_line] = Layout::vertical([
+        let [
+            net_line,
+            dev_line1,
+            dev_line2,
+            uart_line,
+            log_area,
+            hint_line,
+        ] = Layout::vertical([
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
