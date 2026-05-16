@@ -1,6 +1,6 @@
 use log::{error, info};
 
-use super::{AppError, AppEvent, DeviceInfo, ExtractionState, GlobalAppState};
+use super::{AppError, AppEvent, ConnectionStatus, DeviceInfo, ExtractionState, GlobalAppState};
 use crate::button::{Button, ButtonPressType};
 use crate::screens::Screen;
 use crate::telemetry::{TelemetryFrame, update_state_with_events};
@@ -87,10 +87,32 @@ impl AppStateMachine {
             }
 
             AppEvent::WifiStatusChanged(status) => {
+                match &status {
+                    ConnectionStatus::Connected | ConnectionStatus::Disconnected => {
+                        state.events_log.push_front(format!("Wi-Fi: {:?}", status));
+                        if state.events_log.len() > 10 {
+                            state.events_log.pop_back();
+                        }
+                    }
+                    _ => {}
+                }
                 state.wifi_status = status;
             }
 
             AppEvent::MqttStatusChanged(status) => {
+                let should_log = match &status {
+                    ConnectionStatus::Connected => {
+                        state.mqtt_status != ConnectionStatus::Connected
+                    }
+                    ConnectionStatus::Disconnected | ConnectionStatus::Error(_) => true,
+                    _ => false,
+                };
+                if should_log {
+                    state.events_log.push_front(format!("MQTT: {:?}", status));
+                    if state.events_log.len() > 10 {
+                        state.events_log.pop_back();
+                    }
+                }
                 state.mqtt_status = status;
             }
 
