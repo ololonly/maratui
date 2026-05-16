@@ -249,7 +249,11 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             app.handle_event(AppEvent::DeviceInfoUpdated(DeviceInfo {
                 wifi_ssid: ssid,
                 wifi_rssi: query_wifi_rssi(),
-                ip: wifi.sta_netif().get_ip_info().ok().map(|i| i.ip.to_string()),
+                ip: wifi
+                    .sta_netif()
+                    .get_ip_info()
+                    .ok()
+                    .map(|i| i.ip.to_string()),
                 uptime_s: now.saturating_duration_since(boot_time).as_secs(),
                 free_heap_b: Some(query_free_heap()),
             }));

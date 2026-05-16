@@ -101,9 +101,7 @@ impl AppStateMachine {
 
             AppEvent::MqttStatusChanged(status) => {
                 let should_log = match &status {
-                    ConnectionStatus::Connected => {
-                        state.mqtt_status != ConnectionStatus::Connected
-                    }
+                    ConnectionStatus::Connected => state.mqtt_status != ConnectionStatus::Connected,
                     ConnectionStatus::Disconnected | ConnectionStatus::Error(_) => true,
                     _ => false,
                 };
