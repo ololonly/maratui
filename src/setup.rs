@@ -128,7 +128,7 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     app.render_image(terminal.backend_mut().display_mut());
     terminal.draw(|f| app.draw(f)).unwrap();
 
-    let (_wifi, initial_ip) = init_wifi(modem, &app_config);
+    let (mut wifi, _) = init_wifi(modem, &app_config);
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connected));
 
     // ── MQTT ────────────────────────────────────────────────────────────────
@@ -187,6 +187,9 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 
     let boot_time = Instant::now();
     let mut last_status_at: Option<Instant> = None;
+    let mut last_wifi_check_at: Option<Instant> = None;
+    let mut wifi_reconnect_at: Option<Instant> = None;
+    let mut wifi_was_connected = true;
     let mut prev_had_telemetry = false;
 
     loop {
@@ -220,6 +223,14 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 
         if let Some(status_rx) = mqtt_status_rx.as_mut() {
             while let Ok(status) = status_rx.try_recv() {
+                if status == ConnectionStatus::Connected {
+                    let topic = format!("{}/cup_counter", app_config.mqtt.topic_prefix);
+                    if let Some(client) = mqtt_client.as_mut() {
+                        if let Err(e) = client.subscribe(&topic, QoS::AtMostOnce) {
+                            warn!("Failed to re-subscribe to {}: {:?}", topic, e);
+                        }
+                    }
+                }
                 app.handle_event(AppEvent::MqttStatusChanged(status));
             }
         }
@@ -238,10 +249,46 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             app.handle_event(AppEvent::DeviceInfoUpdated(DeviceInfo {
                 wifi_ssid: ssid,
                 wifi_rssi: query_wifi_rssi(),
-                ip: initial_ip.clone(),
+                ip: wifi
+                    .sta_netif()
+                    .get_ip_info()
+                    .ok()
+                    .map(|i| i.ip.to_string()),
                 uptime_s: now.saturating_duration_since(boot_time).as_secs(),
                 free_heap_b: Some(query_free_heap()),
             }));
+        }
+
+        let should_check_wifi = last_wifi_check_at
+            .map(|t| now.saturating_duration_since(t) >= WIFI_CHECK_INTERVAL)
+            .unwrap_or(true);
+        if should_check_wifi {
+            last_wifi_check_at = Some(now);
+            let is_connected = query_wifi_rssi().is_some();
+            if is_connected != wifi_was_connected {
+                wifi_was_connected = is_connected;
+                if is_connected {
+                    info!("Wi-Fi reconnected");
+                    app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Connected));
+                } else {
+                    info!("Wi-Fi disconnected");
+                    app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Disconnected));
+                }
+            }
+            if !is_connected {
+                let should_reconnect = wifi_reconnect_at
+                    .map(|t| now.saturating_duration_since(t) >= WIFI_RECONNECT_INTERVAL)
+                    .unwrap_or(true);
+                if should_reconnect {
+                    wifi_reconnect_at = Some(now);
+                    info!("Wi-Fi disconnected, attempting reconnect");
+                    if let Err(e) = wifi.connect() {
+                        warn!("Wi-Fi reconnect failed: {:?}", e);
+                    }
+                }
+            } else {
+                wifi_reconnect_at = None;
+            }
         }
 
         for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
@@ -269,6 +316,8 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
 }
 
 const STATUS_INTERVAL: Duration = Duration::from_secs(30);
+const WIFI_CHECK_INTERVAL: Duration = Duration::from_secs(10);
+const WIFI_RECONNECT_INTERVAL: Duration = Duration::from_secs(15);
 const MIN_STAGE_MS: u64 = 800;
 
 fn min_stage_delay(started_at: Instant) {
