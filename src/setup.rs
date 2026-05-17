@@ -256,6 +256,9 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
                     .map(|i| i.ip.to_string()),
                 uptime_s: now.saturating_duration_since(boot_time).as_secs(),
                 free_heap_b: Some(query_free_heap()),
+                last_telemetry_age_s: app
+                    .last_uart_frame_at()
+                    .map(|t| now.saturating_duration_since(t).as_secs()),
             }));
         }
 

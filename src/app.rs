@@ -44,6 +44,9 @@ pub trait MaraUiApp {
     /// Returns `true` once the first UART telemetry frame has arrived
     fn has_telemetry(&self) -> bool;
 
+    /// Time of the last received UART telemetry frame
+    fn last_uart_frame_at(&self) -> Option<Instant>;
+
     fn render_image<D>(&mut self, display: &mut D)
     where
         D: DrawTarget<Color = Rgb565> + OriginDimensions,
@@ -129,6 +132,10 @@ impl MaraUiApp for MaraUi {
 
     fn has_telemetry(&self) -> bool {
         self.state.machine_state.last_frame.is_some()
+    }
+
+    fn last_uart_frame_at(&self) -> Option<Instant> {
+        self.state.last_uart_frame_at
     }
 
     fn connection_statuses(&self) -> (ConnectionStatus, ConnectionStatus) {
