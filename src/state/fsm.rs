@@ -259,9 +259,13 @@ fn device_status_payload(info: &DeviceInfo) -> String {
         .free_heap_b
         .map(|v| v.to_string())
         .unwrap_or_else(|| "null".to_string());
+    let tele_age = info
+        .last_telemetry_age_s
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "null".to_string());
     format!(
-        "{{\"uptime_s\":{},\"wifi_ssid\":\"{}\",\"wifi_rssi\":{},\"ip\":{},\"free_heap_b\":{}}}",
-        info.uptime_s, info.wifi_ssid, rssi, ip, heap,
+        "{{\"uptime_s\":{},\"wifi_ssid\":\"{}\",\"wifi_rssi\":{},\"ip\":{},\"free_heap_b\":{},\"last_telemetry_age_s\":{}}}",
+        info.uptime_s, info.wifi_ssid, rssi, ip, heap, tele_age,
     )
 }
 

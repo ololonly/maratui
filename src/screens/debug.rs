@@ -9,6 +9,19 @@ use crate::state::GlobalAppState;
 
 const UART_ACTIVITY_FLASH: Duration = Duration::from_millis(250);
 
+fn format_uptime(secs: u64) -> String {
+    let days = secs / 86400;
+    let hours = (secs % 86400) / 3600;
+    let mins = (secs % 3600) / 60;
+    if days > 0 {
+        format!("{}d{}h{}m", days, hours, mins)
+    } else if hours > 0 {
+        format!("{}h{}m", hours, mins)
+    } else {
+        format!("{}m", mins)
+    }
+}
+
 /// Debug screen showing raw UART telemetry data
 #[derive(Default)]
 pub struct Debug;
@@ -51,9 +64,20 @@ impl Board for Debug {
             .unwrap_or_else(|| "N/A".to_string());
         // ~45 chars per line at 7px/char on 320px display
         let dev_text1 = format!("DEV: ssid={} rssi={}", dev.wifi_ssid, rssi_str);
-        let dev_text2 = format!("     ip={} up={}s heap={}", ip_str, dev.uptime_s, heap_str);
 
         let now = Instant::now();
+        let tele_age_str = state
+            .last_uart_frame_at
+            .map(|t| format!("{}s", now.saturating_duration_since(t).as_secs()))
+            .unwrap_or_else(|| "?".to_string());
+        let dev_text2 = format!(
+            "     ip={} up={} heap={} rx={}",
+            ip_str,
+            format_uptime(dev.uptime_s),
+            heap_str,
+            tele_age_str,
+        );
+
         let activity_marker = match state.last_uart_frame_at {
             Some(t) if now.saturating_duration_since(t) < UART_ACTIVITY_FLASH => "●",
             _ => " ",

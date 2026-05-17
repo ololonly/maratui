@@ -78,6 +78,8 @@ pub struct DeviceInfo {
     pub ip: Option<String>,
     pub uptime_s: u64,
     pub free_heap_b: Option<u32>,
+    /// Seconds since the last UART telemetry frame was received
+    pub last_telemetry_age_s: Option<u64>,
 }
 
 /// Application errors

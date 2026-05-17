@@ -171,6 +171,9 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                 ip: Some("127.0.0.1".to_string()),
                 uptime_s: now.saturating_duration_since(boot_time).as_secs(),
                 free_heap_b: None,
+                last_telemetry_age_s: app
+                    .last_uart_frame_at()
+                    .map(|t| now.saturating_duration_since(t).as_secs()),
             }));
         }
 
@@ -204,7 +207,7 @@ fn init_simulator_mqtt(
     let Some((host, port)) = parse_mqtt_host_port(&cfg.mqtt.url) else {
         return (None, None, None);
     };
-    let mut options = MqttOptions::new(cfg.mqtt.client_id.clone(), host, port);
+    let mut options = MqttOptions::new(format!("{}-sim", cfg.mqtt.client_id), host, port);
     options.set_keep_alive(Duration::from_secs(30));
 
     if let Some(username) = cfg.mqtt.username.as_ref() {
