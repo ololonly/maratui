@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Contributing Rules
+
+- **All commit messages and pull request titles/descriptions must be written in English.**
+
 ## What This Is
 
 MaraTUI is an embedded Rust TUI application for the **Lelit Mara** espresso machine. It runs on an ESP32 microcontroller driving an ILI9341 320×240 display via SPI, reads telemetry from the machine over UART, and publishes events to MQTT. A host simulator mode exists for UI development without hardware.
@@ -91,6 +95,21 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 | M | Publish manual MQTT event |
 
 ---
+
+## Node-RED / Home Assistant Bridge (`docs/node-red-ha-bridge.json`)
+
+`docs/node-red-ha-bridge.json` is a Node-RED flow that bridges MaraTUI MQTT topics to Home Assistant via MQTT Discovery. Import it into Node-RED to get HA sensors out of the box.
+
+**Keep this file in sync when changing MQTT payloads:**
+
+| Change | What to update in the flow |
+|--------|---------------------------|
+| Add/remove a field in `mara/status` payload (`device_status_payload` in `fsm.rs`) | `fn_status` function node + `fn_discovery` sensor list |
+| Add/remove a field in `mara/telemetry` payload (`telemetry_payload` in `fsm.rs`) | `fn_telemetry` function node + `fn_discovery` sensor list |
+| Add/remove an event type in `mara/events` | `fn_events` function node |
+| Rename MQTT topic prefix | `mqtt_in_*` nodes (topic field) and any hardcoded topic strings in function nodes |
+
+The simulator connects with client ID `<MARATUI_MQTT_CLIENT_ID>-sim` (e.g. `maratui-dev-sim`) to avoid session conflicts when device and simulator run simultaneously.
 
 ---
 
