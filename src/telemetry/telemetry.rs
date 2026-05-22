@@ -104,7 +104,8 @@ pub enum ParseError {
 /// <Mode><Version>,<boiler_now>,<boiler_target_or_Lxx>,<hx_now>,<boost>,<heating>,<pump>
 /// Examples:
 /// - C1.10,037,138,035,0000,0,1
-/// - C1.10,037,L65,035,0000,0,0
+/// - C1.10,037,L65,035,0000,0,0   (no water)
+/// - +1.10,089,P75,067,0000,0,0   (P-prefix seen at cold startup in xmode_coffee; semantics TBD)
 pub fn parse_uart_line(line: &str) -> Result<TelemetryFrame, ParseError> {
     let s = line.trim();
     if s.is_empty() {
@@ -140,6 +141,11 @@ pub fn parse_uart_line(line: &str) -> Result<TelemetryFrame, ParseError> {
         if let Some(code) = t.strip_prefix('L') {
             let code = parse_u16(code, "no_water_code")?;
             (None, Some(code))
+        } else if t.starts_with(|c: char| c.is_ascii_alphabetic()) {
+            // Non-numeric prefix other than 'L' — observed as "Pxx" at cold startup in xmode_coffee.
+            // Exact semantics are still under investigation (possibly power-up / initial-heating phase).
+            // Accepted without error; boiler_target treated as unknown until the frame normalises.
+            (None, None)
         } else {
             let target = parse_u16(t, "boiler_target_c")?;
             (Some(target), None)
@@ -377,6 +383,18 @@ mod tests {
         assert_eq!(f.boiler_target_c, None);
         assert_eq!(f.no_water_code, Some(65));
         assert_eq!(f.heating_on, false);
+        assert_eq!(f.pump_on, false);
+    }
+
+    #[test]
+    fn parse_p_prefix_cold_startup() {
+        // "Pxx" seen at cold startup in xmode_coffee; semantics TBD — must not crash the parser.
+        let f = parse_uart_line("+1.10,089,P75,067,0000,0,0").unwrap();
+        assert_eq!(f.mode, MachineMode::Coffee);
+        assert_eq!(f.boiler_now_c, 89);
+        assert_eq!(f.boiler_target_c, None);
+        assert_eq!(f.no_water_code, None);
+        assert_eq!(f.hx_now_c, 67);
         assert_eq!(f.pump_on, false);
     }
 
