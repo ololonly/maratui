@@ -175,7 +175,11 @@ impl AppStateMachine {
 
         // Extract Copy fields from last_frame before the mutable borrows below
         let (boiler_target, boiler_now_c, hx_now_c) = {
-            let last = state.machine_state.last_frame.as_ref().unwrap();
+            let last = state
+            .machine_state
+            .last_frame
+            .as_ref()
+            .expect("update_state_with_events always stores the frame in last_frame");
             (
                 last.boiler_target_c.map(f64::from).unwrap_or_default(),
                 f64::from(last.boiler_now_c),
@@ -213,24 +217,26 @@ impl AppStateMachine {
     }
 }
 
+fn json_opt_num<T: std::fmt::Display>(opt: Option<T>) -> String {
+    opt.map_or_else(|| "null".to_string(), |v| v.to_string())
+}
+
+fn json_opt_str(opt: Option<&str>) -> String {
+    opt.map_or_else(|| "null".to_string(), |s| format!("\"{}\"", s))
+}
+
 fn telemetry_payload(frame: &TelemetryFrame) -> String {
     format!(
         "{{\"mode\":\"{}\",\"sw\":\"{}\",\"boiler_now_c\":{},\"boiler_target_c\":{},\"hx_now_c\":{},\"boost_countdown_s\":{},\"heating_on\":{},\"pump_on\":{},\"no_water_code\":{}}}",
         frame.mode,
         frame.sw_version,
         frame.boiler_now_c,
-        frame
-            .boiler_target_c
-            .map(|v| v.to_string())
-            .unwrap_or_else(|| "null".to_string()),
+        json_opt_num(frame.boiler_target_c),
         frame.hx_now_c,
         frame.boost_countdown_s,
         frame.heating_on,
         frame.pump_on,
-        frame
-            .no_water_code
-            .map(|v| v.to_string())
-            .unwrap_or_else(|| "null".to_string())
+        json_opt_num(frame.no_water_code),
     )
 }
 
@@ -246,26 +252,14 @@ fn push_sample(buf: &mut std::collections::VecDeque<f64>, value: f64) {
 }
 
 fn device_status_payload(info: &DeviceInfo) -> String {
-    let rssi = info
-        .wifi_rssi
-        .map(|v| v.to_string())
-        .unwrap_or_else(|| "null".to_string());
-    let ip = info
-        .ip
-        .as_deref()
-        .map(|s| format!("\"{}\"", s))
-        .unwrap_or_else(|| "null".to_string());
-    let heap = info
-        .free_heap_b
-        .map(|v| v.to_string())
-        .unwrap_or_else(|| "null".to_string());
-    let tele_age = info
-        .last_telemetry_age_s
-        .map(|v| v.to_string())
-        .unwrap_or_else(|| "null".to_string());
     format!(
         "{{\"uptime_s\":{},\"wifi_ssid\":\"{}\",\"wifi_rssi\":{},\"ip\":{},\"free_heap_b\":{},\"last_telemetry_age_s\":{}}}",
-        info.uptime_s, info.wifi_ssid, rssi, ip, heap, tele_age,
+        info.uptime_s,
+        info.wifi_ssid,
+        json_opt_num(info.wifi_rssi),
+        json_opt_str(info.ip.as_deref()),
+        json_opt_num(info.free_heap_b),
+        json_opt_num(info.last_telemetry_age_s),
     )
 }
 
@@ -325,7 +319,7 @@ mod tests {
         AppStateMachine::handle_event(
             &mut state,
             AppEvent::ShotEnded {
-                duration: duration.as_secs() as u64,
+                duration: duration.as_secs(),
             },
         );
 
@@ -455,7 +449,7 @@ mod tests {
         AppStateMachine::handle_event(
             &mut state,
             AppEvent::ShotEnded {
-                duration: duration.as_secs() as u64,
+                duration: duration.as_secs(),
             },
         );
 

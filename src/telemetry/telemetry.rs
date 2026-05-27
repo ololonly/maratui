@@ -221,7 +221,6 @@ pub enum AppEvent {
 #[derive(Debug)]
 pub struct MachineState {
     pub last_frame: Option<TelemetryFrame>,
-    pub last_update: Option<Instant>,
     pub shot_started_at: Option<Instant>,
     pub last_graph_sample_at: Option<Instant>,
     pub target_boiler_data: VecDeque<f64>,
@@ -238,7 +237,6 @@ impl Default for MachineState {
     fn default() -> Self {
         Self {
             last_frame: None,
-            last_update: None,
             shot_started_at: None,
             last_graph_sample_at: None,
             target_boiler_data: VecDeque::with_capacity(300),
@@ -349,7 +347,6 @@ pub fn update_state_with_events(
         _ => {}
     }
 
-    state.last_update = Some(now);
     let is_extracting = frame.pump_on;
     state.last_frame = Some(frame);
     let snapshot = Snapshot { is_extracting };
@@ -373,8 +370,8 @@ mod tests {
         assert_eq!(f.no_water_code, None);
         assert_eq!(f.hx_now_c, 35);
         assert_eq!(f.boost_countdown_s, 0);
-        assert_eq!(f.heating_on, true);
-        assert_eq!(f.pump_on, false);
+        assert!(f.heating_on);
+        assert!(!f.pump_on);
     }
 
     #[test]
@@ -382,8 +379,8 @@ mod tests {
         let f = parse_uart_line("C1.10,037,L65,035,0000,0,0").unwrap();
         assert_eq!(f.boiler_target_c, None);
         assert_eq!(f.no_water_code, Some(65));
-        assert_eq!(f.heating_on, false);
-        assert_eq!(f.pump_on, false);
+        assert!(!f.heating_on);
+        assert!(!f.pump_on);
     }
 
     #[test]
@@ -395,7 +392,7 @@ mod tests {
         assert_eq!(f.boiler_target_c, None);
         assert_eq!(f.no_water_code, None);
         assert_eq!(f.hx_now_c, 67);
-        assert_eq!(f.pump_on, false);
+        assert!(!f.pump_on);
     }
 
     #[test]

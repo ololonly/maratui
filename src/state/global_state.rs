@@ -156,11 +156,6 @@ impl Default for GlobalAppState {
 }
 
 impl GlobalAppState {
-    /// Create a new application state
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Get the duration of the current extraction in seconds
     pub fn extraction_duration_secs(&self) -> u64 {
         self.extraction_state
