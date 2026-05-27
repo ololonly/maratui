@@ -12,13 +12,13 @@ use crate::screens::screen::Board;
 use crate::state::GlobalAppState;
 use crate::telemetry::{MachineMode, TelemetryFrame};
 
-const STYLE_GREEN:     Style = Style::new().fg(Color::Green);
-const STYLE_CYAN:      Style = Style::new().fg(Color::Cyan);
-const STYLE_RED:       Style = Style::new().fg(Color::Red);
-const STYLE_GRAY:      Style = Style::new().fg(Color::Gray);
+const STYLE_GREEN: Style = Style::new().fg(Color::Green);
+const STYLE_CYAN: Style = Style::new().fg(Color::Cyan);
+const STYLE_RED: Style = Style::new().fg(Color::Red);
+const STYLE_GRAY: Style = Style::new().fg(Color::Gray);
 const STYLE_DARK_GRAY: Style = Style::new().fg(Color::DarkGray);
-const STYLE_WHITE:     Style = Style::new().fg(Color::White);
-const STYLE_YELLOW:    Style = Style::new().fg(Color::Yellow);
+const STYLE_WHITE: Style = Style::new().fg(Color::White);
+const STYLE_YELLOW: Style = Style::new().fg(Color::Yellow);
 
 const BOILER_SCALE_MAX: u16 = 160;
 const SHOT_GAUGE_MAX_SECS: u64 = 30;
@@ -119,12 +119,28 @@ fn render_info_col(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     render_hx_vgauge(t_frame.hx_now_c, hx_gauge_area, buf);
 
     let heat_span = Span::styled(
-        if t_frame.heating_on { "● HEAT" } else { "○ HEAT" },
-        if t_frame.heating_on { STYLE_GREEN } else { STYLE_DARK_GRAY },
+        if t_frame.heating_on {
+            "● HEAT"
+        } else {
+            "○ HEAT"
+        },
+        if t_frame.heating_on {
+            STYLE_GREEN
+        } else {
+            STYLE_DARK_GRAY
+        },
     );
     let pump_span = Span::styled(
-        if t_frame.pump_on { "● PUMP" } else { "○ PUMP" },
-        if t_frame.pump_on { STYLE_GREEN } else { STYLE_DARK_GRAY },
+        if t_frame.pump_on {
+            "● PUMP"
+        } else {
+            "○ PUMP"
+        },
+        if t_frame.pump_on {
+            STYLE_GREEN
+        } else {
+            STYLE_DARK_GRAY
+        },
     );
 
     Paragraph::new(vec![

@@ -176,10 +176,10 @@ impl AppStateMachine {
         // Extract Copy fields from last_frame before the mutable borrows below
         let (boiler_target, boiler_now_c, hx_now_c) = {
             let last = state
-            .machine_state
-            .last_frame
-            .as_ref()
-            .expect("update_state_with_events always stores the frame in last_frame");
+                .machine_state
+                .last_frame
+                .as_ref()
+                .expect("update_state_with_events always stores the frame in last_frame");
             (
                 last.boiler_target_c.map(f64::from).unwrap_or_default(),
                 f64::from(last.boiler_now_c),
