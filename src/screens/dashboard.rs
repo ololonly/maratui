@@ -3,7 +3,7 @@ use std::time::Duration;
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Padding, Paragraph, Widget};
 use tui_widgets::big_text::{BigText, PixelSize};
@@ -11,6 +11,14 @@ use tui_widgets::big_text::{BigText, PixelSize};
 use crate::screens::screen::Board;
 use crate::state::GlobalAppState;
 use crate::telemetry::{MachineMode, TelemetryFrame};
+
+const STYLE_GREEN: Style = Style::new().fg(Color::Green);
+const STYLE_CYAN: Style = Style::new().fg(Color::Cyan);
+const STYLE_RED: Style = Style::new().fg(Color::Red);
+const STYLE_GRAY: Style = Style::new().fg(Color::Gray);
+const STYLE_DARK_GRAY: Style = Style::new().fg(Color::DarkGray);
+const STYLE_WHITE: Style = Style::new().fg(Color::White);
+const STYLE_YELLOW: Style = Style::new().fg(Color::Yellow);
 
 const BOILER_SCALE_MAX: u16 = 160;
 const SHOT_GAUGE_MAX_SECS: u64 = 30;
@@ -61,12 +69,12 @@ impl Board for Dashboard {
 
 fn render_mode_banner(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     let (label, style) = match t_frame.mode {
-        MachineMode::Coffee => ("═══ COFFEE MODE ═══", Style::new().green()),
+        MachineMode::Coffee => ("═══ COFFEE MODE ═══", STYLE_GREEN),
         MachineMode::SteamS | MachineMode::SteamV | MachineMode::SteamC => {
-            ("═══ STEAM MODE ═══", Style::new().cyan())
+            ("═══ STEAM MODE ═══", STYLE_CYAN)
         }
-        MachineMode::Offline => ("═══  OFFLINE  ═══", Style::new().red()),
-        MachineMode::Unknown(_) => ("═══  UNKNOWN  ═══", Style::new().gray()),
+        MachineMode::Offline => ("═══  OFFLINE  ═══", STYLE_RED),
+        MachineMode::Unknown(_) => ("═══  UNKNOWN  ═══", STYLE_GRAY),
     };
 
     Paragraph::new(Line::from(label))
@@ -82,14 +90,14 @@ fn render_cup_counter(count: Option<u64>, area: Rect, buf: &mut Buffer) {
 
     Paragraph::new(Line::from(format!("Cups brewed: {cups}")))
         .centered()
-        .style(Style::new().white())
+        .style(STYLE_WHITE)
         .render(area, buf);
 }
 
 fn render_info_col(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
-        .border_style(Style::new().yellow());
+        .border_style(STYLE_YELLOW);
     let inner = block.inner(area);
     block.render(area, buf);
 
@@ -101,9 +109,9 @@ fn render_info_col(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
         Layout::horizontal([Constraint::Fill(1), Constraint::Length(2)]).areas(hx_area);
 
     Paragraph::new(vec![
-        Line::styled("HX", Style::new().dark_gray()),
+        Line::styled("HX", STYLE_DARK_GRAY),
         Line::raw(""),
-        Line::styled(format!("{}°", t_frame.hx_now_c), Style::new().cyan()),
+        Line::styled(format!("{}°", t_frame.hx_now_c), STYLE_CYAN),
     ])
     .centered()
     .render(hx_text_area, buf);
@@ -117,9 +125,9 @@ fn render_info_col(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
             "○ HEAT"
         },
         if t_frame.heating_on {
-            Style::new().green()
+            STYLE_GREEN
         } else {
-            Style::new().dark_gray()
+            STYLE_DARK_GRAY
         },
     );
     let pump_span = Span::styled(
@@ -129,9 +137,9 @@ fn render_info_col(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
             "○ PUMP"
         },
         if t_frame.pump_on {
-            Style::new().green()
+            STYLE_GREEN
         } else {
-            Style::new().dark_gray()
+            STYLE_DARK_GRAY
         },
     );
 
@@ -167,10 +175,10 @@ fn render_hx_vgauge(temp: u16, area: Rect, buf: &mut Buffer) {
     let ideal_bot_row = temp_to_row(HX_IDEAL_LOW);
 
     let fill_style = match temp {
-        0..=87 => Style::new().white(),
-        88..=95 => Style::new().green(),
-        96..=100 => Style::new().yellow(),
-        _ => Style::new().red(),
+        0..=87 => STYLE_WHITE,
+        88..=95 => STYLE_GREEN,
+        96..=100 => STYLE_YELLOW,
+        _ => STYLE_RED,
     };
 
     let w = area.width as usize;
@@ -186,9 +194,9 @@ fn render_hx_vgauge(temp: u16, area: Rect, buf: &mut Buffer) {
         let (s, style) = if is_filled {
             (fill.as_str(), fill_style)
         } else if in_ideal {
-            (ideal.as_str(), Style::new().green())
+            (ideal.as_str(), STYLE_GREEN)
         } else {
-            (empty.as_str(), Style::new().dark_gray())
+            (empty.as_str(), STYLE_DARK_GRAY)
         };
 
         buf.set_string(area.x, y, s, style);
@@ -203,7 +211,7 @@ fn render_boiler_gauge(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     let block = Block::bordered()
         .title("Boiler")
         .border_type(BorderType::Rounded)
-        .border_style(Style::new().yellow());
+        .border_style(STYLE_YELLOW);
     let inner = block.inner(area);
     block.render(area, buf);
 
@@ -214,7 +222,7 @@ fn render_boiler_gauge(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     let Some(target) = t_frame.boiler_target_c else {
         Paragraph::new(Line::from("NO WATER"))
             .centered()
-            .style(Style::new().red())
+            .style(STYLE_RED)
             .render(inner, buf);
         return;
     };
@@ -225,11 +233,7 @@ fn render_boiler_gauge(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     // Left label: "120°/138° "
     let label = format!("{:3}°/{:3}° ", now, target);
     let label_len = label.len() as u16; // all ASCII + °(1 display width each)
-    let label_style = if at_temp {
-        Style::new().green()
-    } else {
-        Style::new().yellow()
-    };
+    let label_style = if at_temp { STYLE_GREEN } else { STYLE_YELLOW };
     buf.set_string(inner.x, inner.y, &label, label_style);
 
     let bar_x = inner.x + label_len;
@@ -252,15 +256,15 @@ fn render_boiler_gauge(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
         let (ch, style) = if i < current_pos {
             // Filled portion — two-tone: warming → ready
             if i >= ready_pos {
-                ("█", Style::new().green())
+                ("█", STYLE_GREEN)
             } else {
-                ("█", Style::new().yellow())
+                ("█", STYLE_YELLOW)
             }
         } else if i == target_pos {
             // Target marker (current hasn't reached it yet)
-            ("│", Style::new().white())
+            ("│", STYLE_WHITE)
         } else {
-            ("─", Style::new().dark_gray())
+            ("─", STYLE_DARK_GRAY)
         };
         buf.set_string(x, inner.y, ch, style);
     }
@@ -275,7 +279,7 @@ fn render_shot_gauge(state: &GlobalAppState, area: Rect, buf: &mut Buffer) {
         .title_bottom("%")
         .title_alignment(ratatui::layout::HorizontalAlignment::Center)
         .border_type(BorderType::Rounded)
-        .border_style(Style::new().yellow());
+        .border_style(STYLE_YELLOW);
     let inner = block.inner(area);
     block.render(area, buf);
 
@@ -296,7 +300,7 @@ fn render_shot_gauge(state: &GlobalAppState, area: Rect, buf: &mut Buffer) {
         if is_filled {
             buf.set_string(inner.x, y, &fill, fill_style);
         } else {
-            buf.set_string(inner.x, y, &empty, Style::new().dark_gray());
+            buf.set_string(inner.x, y, &empty, STYLE_DARK_GRAY);
         }
     }
 }
@@ -310,14 +314,14 @@ fn render_timer(state: &GlobalAppState, area: Rect, frame: &mut Frame) {
     } else if state.extraction_state.last_extraction_duration().is_some() {
         shot_style(extraction_secs, false)
     } else {
-        Style::new().dark_gray()
+        STYLE_DARK_GRAY
     };
 
     let timer_block = Block::bordered()
         .title_bottom("Extraction")
         .title_alignment(ratatui::layout::HorizontalAlignment::Center)
         .border_type(BorderType::Rounded)
-        .border_style(Style::new().yellow())
+        .border_style(STYLE_YELLOW)
         .padding(Padding::top(1));
 
     let timer_inner = timer_block.inner(area);
@@ -369,16 +373,16 @@ fn current_extraction_secs(state: &GlobalAppState) -> u64 {
 fn shot_style(secs: u64, is_live: bool) -> Style {
     if is_live {
         match secs {
-            0..=19 => Style::new().white(),
-            20..=27 => Style::new().green(),
-            _ => Style::new().yellow(),
+            0..=19 => STYLE_WHITE,
+            20..=27 => STYLE_GREEN,
+            _ => STYLE_YELLOW,
         }
     } else {
         match secs {
-            0..=14 => Style::new().red(),
-            15..=19 => Style::new().yellow(),
-            20..=30 => Style::new().green(),
-            _ => Style::new().yellow(),
+            0..=14 => STYLE_RED,
+            15..=19 => STYLE_YELLOW,
+            20..=30 => STYLE_GREEN,
+            _ => STYLE_YELLOW,
         }
     }
 }
