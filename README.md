@@ -51,6 +51,16 @@ Accessible only via long press. Shows:
 |---------|-----------|-------|
 | ![Loading](assets/docs/loading_screen.png) | ![Dashboard](assets/docs/extraction_screen.png) | ![Debug](assets/docs/debug_screen.png) |
 
+## PCB
+
+Custom controller board designed for this project — ESP32 driving the ILI9341 display, UART telemetry input, and a single button.
+
+| Front | Back |
+|-------|------|
+| ![PCB front](hardware/renders/front.png) | ![PCB back](hardware/renders/back.png) |
+
+See [`hardware/`](hardware/) for KiCad source files, Gerbers, and full pinout.
+
 ## Navigation
 
 There is a single physical button (Button1).
@@ -123,7 +133,7 @@ Keyboard controls in the simulator:
 
 ### Hardware
 
-See [docs/hardware.md](docs/hardware.md) for ESP32 pinout, display wiring.
+See [docs/hardware.md](docs/hardware.md) for ESP32 pinout and display wiring. KiCad project, Gerbers, and renders are in [`hardware/`](hardware/).
 
 ### Home Assistant integration
 
