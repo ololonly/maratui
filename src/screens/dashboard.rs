@@ -394,6 +394,6 @@ fn shot_quality_label(secs: u64) -> &'static str {
         24..=27 => "PERFECT",
         28..=31 => "LONG SHOT",
         32..=39 => "BLONDING",
-        _ => "WTF YOU'RE DOUING?",
+        _ => "RIP SHOT",
     }
 }
