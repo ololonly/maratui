@@ -2,6 +2,7 @@ use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
 use crate::config::AppConfig;
 use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
+use crate::state::global_state::MqttOutboundMessage;
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::Size;
 use mousefood::fonts::*;
@@ -150,6 +151,10 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
 
         if let Some(status_rx) = mqtt_status_rx.as_mut() {
             while let Ok(status) = status_rx.try_recv() {
+                if status == ConnectionStatus::Connected {
+                    #[cfg(feature = "home-assistant")]
+                    app.enqueue_home_assistant(&app_config.mqtt.topic_prefix);
+                }
                 app.handle_event(AppEvent::MqttStatusChanged(status));
             }
         }
@@ -180,8 +185,8 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
         let (_, mqtt_status) = app.connection_statuses();
         let messages = app.take_outbound_mqtt_messages();
         if mqtt_status == ConnectionStatus::Connected {
-            for (topic_suffix, payload) in messages {
-                publish_mqtt_message(&mut mqtt, &app_config, &topic_suffix, &payload);
+            for msg in messages {
+                publish_mqtt_message(&mut mqtt, &app_config, &msg);
             }
         }
 
@@ -263,13 +268,21 @@ fn parse_mqtt_host_port(url: &str) -> Option<(String, u16)> {
 fn publish_mqtt_message(
     client: &mut Option<Client>,
     cfg: &AppConfig,
-    topic_suffix: &str,
-    payload: &str,
+    msg: &MqttOutboundMessage,
 ) {
     let Some(client) = client.as_mut() else {
         return;
     };
 
-    let topic = format!("{}/{}", cfg.mqtt.topic_prefix, topic_suffix);
-    let _ = client.publish(topic, QoS::AtMostOnce, false, payload);
+    let topic = if msg.absolute {
+        msg.topic_suffix.clone()
+    } else {
+        format!("{}/{}", cfg.mqtt.topic_prefix, msg.topic_suffix)
+    };
+    let qos = if msg.retain {
+        QoS::AtLeastOnce
+    } else {
+        QoS::AtMostOnce
+    };
+    let _ = client.publish(topic, qos, msg.retain, msg.payload.as_bytes());
 }

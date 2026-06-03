@@ -96,18 +96,20 @@ ffmpeg -f lavfi -i color=black:s=180x180 -i rat_barista.png \
 
 ---
 
-## Node-RED / Home Assistant Bridge (`docs/node-red-ha-bridge.json`)
+## Home Assistant Integration (`src/home_assistant.rs`)
 
-`docs/node-red-ha-bridge.json` is a Node-RED flow that bridges MaraTUI MQTT topics to Home Assistant via MQTT Discovery. Import it into Node-RED to get HA sensors out of the box.
+Build with `--features home-assistant` to enable direct HA MQTT Discovery publishing from the firmware — no Node-RED needed. On every MQTT connect, the firmware publishes retained discovery configs to `homeassistant/{sensor,binary_sensor}/maratui_*/config` and streams state updates alongside the existing `mara/*` topics.
 
-**Keep this file in sync when changing MQTT payloads:**
+**Keep `home_assistant.rs` in sync when changing MQTT payloads:**
 
-| Change | What to update in the flow |
-|--------|---------------------------|
-| Add/remove a field in `mara/status` payload (`device_status_payload` in `fsm.rs`) | `fn_status` function node + `fn_discovery` sensor list |
-| Add/remove a field in `mara/telemetry` payload (`telemetry_payload` in `fsm.rs`) | `fn_telemetry` function node + `fn_discovery` sensor list |
-| Add/remove an event type in `mara/events` | `fn_events` function node |
-| Rename MQTT topic prefix | `mqtt_in_*` nodes (topic field) and any hardcoded topic strings in function nodes |
+| Change | What to update |
+|--------|----------------|
+| Add/remove a field in `mara/status` payload (`device_status_payload` in `fsm.rs`) | `enqueue_status_states` in `home_assistant.rs` + sensor list in `enqueue_discovery_configs` |
+| Add/remove a field in `mara/telemetry` payload (`telemetry_payload` in `fsm.rs`) | `enqueue_telemetry_states` in `home_assistant.rs` + sensor list in `enqueue_discovery_configs` |
+| Add/remove an event type in `mara/events` | `enqueue_event_states` in `home_assistant.rs` |
+| Rename MQTT topic prefix | Update `docs/ha-automation.yaml` topic strings |
+
+The cup counter requires a one-time HA automation setup — see `docs/home-assistant.md` and `docs/ha-automation.yaml`.
 
 The simulator connects with client ID `<MARATUI_MQTT_CLIENT_ID>-sim` (e.g. `maratui-dev-sim`) to avoid session conflicts when device and simulator run simultaneously.
 

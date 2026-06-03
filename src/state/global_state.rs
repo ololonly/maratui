@@ -21,8 +21,13 @@ pub enum ConnectionStatus {
 
 #[derive(Clone, Debug)]
 pub struct MqttOutboundMessage {
+    /// Topic suffix (combined with prefix by publish_mqtt_message) unless `absolute` is true.
     pub topic_suffix: String,
     pub payload: String,
+    /// When `true`, the broker should store a retained copy of this message.
+    pub retain: bool,
+    /// When `true`, `topic_suffix` is used as-is (bypasses prefix construction).
+    pub absolute: bool,
 }
 
 /// State of the coffee extraction process
@@ -127,6 +132,8 @@ pub struct GlobalAppState {
     pub last_activity_at: Option<Instant>,
     /// Last time a UART telemetry frame was received (for Debug screen activity marker)
     pub last_uart_frame_at: Option<Instant>,
+    /// Time when the last shot ended (pump turned off after a valid extraction)
+    pub last_shot_ended_at: Option<Instant>,
     /// Board metadata (WiFi RSSI, IP, uptime, free heap)
     pub device_info: DeviceInfo,
     /// Current boot loading stage; `None` before first stage fires, frozen at 100% while waiting for machine
@@ -149,6 +156,7 @@ impl Default for GlobalAppState {
             backlight_on: true,
             last_activity_at: None,
             last_uart_frame_at: None,
+            last_shot_ended_at: None,
             device_info: DeviceInfo::default(),
             loading_status: None,
         }
@@ -187,8 +195,27 @@ impl GlobalAppState {
         self.outbound_mqtt.push_back(MqttOutboundMessage {
             topic_suffix: topic_suffix.into(),
             payload: payload.into(),
+            retain: false,
+            absolute: false,
         });
+        while self.outbound_mqtt.len() > 64 {
+            self.outbound_mqtt.pop_front();
+        }
+    }
 
+    /// Enqueue a message with an absolute topic (not prefixed) and configurable retain flag.
+    pub fn enqueue_absolute_mqtt_message(
+        &mut self,
+        topic: impl Into<String>,
+        payload: impl Into<String>,
+        retain: bool,
+    ) {
+        self.outbound_mqtt.push_back(MqttOutboundMessage {
+            topic_suffix: topic.into(),
+            payload: payload.into(),
+            retain,
+            absolute: true,
+        });
         while self.outbound_mqtt.len() > 64 {
             self.outbound_mqtt.pop_front();
         }

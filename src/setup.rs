@@ -3,6 +3,7 @@ use crate::button::{Button, ButtonState};
 use crate::config::AppConfig;
 use crate::screens::Screen;
 use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
+use crate::state::global_state::MqttOutboundMessage;
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::{DrawTarget, RgbColor};
 use mousefood::fonts::*;
@@ -230,6 +231,8 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
                             warn!("Failed to re-subscribe to {}: {:?}", topic, e);
                         }
                     }
+                    #[cfg(feature = "home-assistant")]
+                    app.enqueue_home_assistant(&app_config.mqtt.topic_prefix);
                 }
                 app.handle_event(AppEvent::MqttStatusChanged(status));
             }
@@ -294,8 +297,8 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             }
         }
 
-        for (topic_suffix, payload) in app.take_outbound_mqtt_messages() {
-            publish_mqtt_message(&mut mqtt_client, &app_config, &topic_suffix, &payload);
+        for msg in app.take_outbound_mqtt_messages() {
+            publish_mqtt_message(&mut mqtt_client, &app_config, &msg);
         }
 
         if app.backlight_active() {
@@ -492,15 +495,23 @@ fn init_mqtt(
 fn publish_mqtt_message(
     client: &mut Option<EspMqttClient<'_>>,
     cfg: &AppConfig,
-    topic_suffix: &str,
-    payload: &str,
+    msg: &MqttOutboundMessage,
 ) {
     let Some(client) = client.as_mut() else {
         return;
     };
 
-    let topic = format!("{}/{}", cfg.mqtt.topic_prefix, topic_suffix);
-    if let Err(e) = client.publish(&topic, QoS::AtMostOnce, false, payload.as_bytes()) {
+    let topic = if msg.absolute {
+        msg.topic_suffix.clone()
+    } else {
+        format!("{}/{}", cfg.mqtt.topic_prefix, msg.topic_suffix)
+    };
+    let qos = if msg.retain {
+        QoS::AtLeastOnce
+    } else {
+        QoS::AtMostOnce
+    };
+    if let Err(e) = client.publish(&topic, qos, msg.retain, msg.payload.as_bytes()) {
         warn!("Failed to publish MQTT message: {:?}", e);
     }
 }

@@ -2,6 +2,8 @@ use log::{error, info};
 
 use super::{AppError, AppEvent, ConnectionStatus, DeviceInfo, ExtractionState, GlobalAppState};
 use crate::button::{Button, ButtonPressType};
+#[cfg(feature = "home-assistant")]
+use crate::home_assistant;
 use crate::screens::Screen;
 use crate::telemetry::{TelemetryFrame, update_state_with_events};
 use std::time::{Duration, Instant};
@@ -34,12 +36,14 @@ impl AppStateMachine {
                 state.extraction_state = ExtractionState::Idle {
                     last_extraction_duration: Some(Duration::from_secs(duration)),
                 };
+                state.last_shot_ended_at = Some(Instant::now());
             }
 
             AppEvent::ShotAborted { .. } => {
                 state.extraction_state = ExtractionState::Idle {
                     last_extraction_duration: None,
                 };
+                state.last_shot_ended_at = Some(Instant::now());
             }
 
             AppEvent::ModeChanged { from: _, to: _ } => {
@@ -127,6 +131,8 @@ impl AppStateMachine {
 
             AppEvent::DeviceInfoUpdated(info) => {
                 let payload = device_status_payload(&info);
+                #[cfg(feature = "home-assistant")]
+                home_assistant::enqueue_status_states(state, &info);
                 state.device_info = info;
                 state.enqueue_mqtt_message("status", payload);
             }
@@ -204,9 +210,14 @@ impl AppStateMachine {
         // Process each event through the FSM
         for event in events {
             let event_payload = telemetry_event_payload(&event);
+            #[cfg(feature = "home-assistant")]
+            home_assistant::enqueue_event_states(state, &event);
             Self::handle_event(state, AppEvent::from_telemetry(event));
             state.enqueue_mqtt_message("events", event_payload);
         }
+
+        #[cfg(feature = "home-assistant")]
+        home_assistant::enqueue_telemetry_states(state);
     }
 
     /// Handle multiple events in sequence
