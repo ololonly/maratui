@@ -3,15 +3,15 @@ use crate::telemetry::AppEvent as TelemetryEvent;
 
 const DEVICE: &str = r#"{"identifiers":["maratui_esp32"],"name":"Lelit Mara","model":"MaraTUI","manufacturer":"Lelit"}"#;
 
-fn s_topic(prefix: &str, id: &str) -> String {
-    format!("{prefix}/ha/{id}")
+fn s_topic(id: &str) -> String {
+    format!("homeassistant/sensor/maratui/{id}")
 }
 
-fn b_topic(prefix: &str, id: &str) -> String {
-    format!("{prefix}/ha/{id}")
+fn b_topic(id: &str) -> String {
+    format!("homeassistant/binary_sensor/maratui/{id}")
 }
 
-fn sensor_config(id: &str, name: &str, extra: &str, state_prefix: &str) -> (String, String) {
+fn sensor_config(id: &str, name: &str, extra: &str) -> (String, String) {
     let extra_part = if extra.is_empty() {
         String::new()
     } else {
@@ -20,12 +20,12 @@ fn sensor_config(id: &str, name: &str, extra: &str, state_prefix: &str) -> (Stri
     (
         format!("homeassistant/sensor/maratui_{id}/config"),
         format!(
-            r#"{{"name":"{name}","unique_id":"maratui_{id}","state_topic":"{state_prefix}/ha/{id}","device":{DEVICE}{extra_part}}}"#
+            r#"{{"name":"{name}","unique_id":"maratui_{id}","state_topic":"homeassistant/sensor/maratui/{id}","device":{DEVICE}{extra_part}}}"#
         ),
     )
 }
 
-fn binary_config(id: &str, name: &str, extra: &str, state_prefix: &str) -> (String, String) {
+fn binary_config(id: &str, name: &str, extra: &str) -> (String, String) {
     let extra_part = if extra.is_empty() {
         String::new()
     } else {
@@ -34,7 +34,7 @@ fn binary_config(id: &str, name: &str, extra: &str, state_prefix: &str) -> (Stri
     (
         format!("homeassistant/binary_sensor/maratui_{id}/config"),
         format!(
-            r#"{{"name":"{name}","unique_id":"maratui_{id}","state_topic":"{state_prefix}/ha/{id}","payload_on":"ON","payload_off":"OFF","device":{DEVICE}{extra_part}}}"#
+            r#"{{"name":"{name}","unique_id":"maratui_{id}","state_topic":"homeassistant/binary_sensor/maratui/{id}","payload_on":"ON","payload_off":"OFF","device":{DEVICE}{extra_part}}}"#
         ),
     )
 }
@@ -112,14 +112,14 @@ pub fn enqueue_discovery_configs(state: &mut GlobalAppState, topic_prefix: &str)
     ];
 
     for (id, name, extra) in sensors {
-        let (topic, payload) = sensor_config(id, name, extra, topic_prefix);
+        let (topic, payload) = sensor_config(id, name, extra);
         state.enqueue_absolute_mqtt_message(topic, payload, true);
     }
 
     // Cup counter: state_topic is the MQTT prefix topic that HA automation publishes to.
     {
         let cup_state_topic = format!("{topic_prefix}/cup_counter");
-        let (config_topic, _) = sensor_config("cup_counter", "Cup Counter", "", topic_prefix);
+        let (config_topic, _) = sensor_config("cup_counter", "Cup Counter", "");
         let payload = format!(
             r#"{{"name":"Cup Counter","unique_id":"maratui_cup_counter","state_topic":"{cup_state_topic}","icon":"mdi:coffee","state_class":"total_increasing","device":{DEVICE}}}"#
         );
@@ -133,7 +133,7 @@ pub fn enqueue_discovery_configs(state: &mut GlobalAppState, topic_prefix: &str)
     ];
 
     for (id, name, extra) in binary_sensors {
-        let (topic, payload) = binary_config(id, name, extra, topic_prefix);
+        let (topic, payload) = binary_config(id, name, extra);
         state.enqueue_absolute_mqtt_message(topic, payload, true);
     }
 }
@@ -164,22 +164,21 @@ pub fn enqueue_telemetry_states(state: &mut GlobalAppState) {
         .unwrap_or(0);
     let last_shot_ended_at = state.last_shot_ended_at;
     let is_extracting = state.extraction_state.is_extracting();
-    let prefix = state.mqtt_topic_prefix.clone();
 
-    state.enqueue_absolute_mqtt_message(s_topic(&prefix, "mode"), mode_str, false);
-    state.enqueue_absolute_mqtt_message(s_topic(&prefix, "firmware"), sw, false);
-    state.enqueue_absolute_mqtt_message(s_topic(&prefix, "boiler_now"), boiler_now.to_string(), false);
+    state.enqueue_absolute_mqtt_message(s_topic("mode"), mode_str, false);
+    state.enqueue_absolute_mqtt_message(s_topic("firmware"), sw, false);
+    state.enqueue_absolute_mqtt_message(s_topic("boiler_now"), boiler_now.to_string(), false);
     if let Some(t) = boiler_target {
-        state.enqueue_absolute_mqtt_message(s_topic(&prefix, "boiler_target"), t.to_string(), false);
+        state.enqueue_absolute_mqtt_message(s_topic("boiler_target"), t.to_string(), false);
     }
-    state.enqueue_absolute_mqtt_message(s_topic(&prefix, "hx_now"), hx_now.to_string(), false);
-    state.enqueue_absolute_mqtt_message(s_topic(&prefix, "extraction_timer"), timer_secs.to_string(), false);
+    state.enqueue_absolute_mqtt_message(s_topic("hx_now"), hx_now.to_string(), false);
+    state.enqueue_absolute_mqtt_message(s_topic("extraction_timer"), timer_secs.to_string(), false);
 
     if let Some(ended_at) = last_shot_ended_at {
         if !is_extracting {
             let mins = ended_at.elapsed().as_secs() / 60;
             state.enqueue_absolute_mqtt_message(
-                s_topic(&prefix, "time_since_last_shot"),
+                s_topic("time_since_last_shot"),
                 mins.to_string(),
                 false,
             );
@@ -187,17 +186,17 @@ pub fn enqueue_telemetry_states(state: &mut GlobalAppState) {
     }
 
     state.enqueue_absolute_mqtt_message(
-        b_topic(&prefix, "heating"),
+        b_topic("heating"),
         if heating_on { "ON" } else { "OFF" },
         false,
     );
     state.enqueue_absolute_mqtt_message(
-        b_topic(&prefix, "pump"),
+        b_topic("pump"),
         if pump_on { "ON" } else { "OFF" },
         false,
     );
     state.enqueue_absolute_mqtt_message(
-        b_topic(&prefix, "water_low"),
+        b_topic("water_low"),
         if water_low { "ON" } else { "OFF" },
         false,
     );
@@ -206,29 +205,28 @@ pub fn enqueue_telemetry_states(state: &mut GlobalAppState) {
 /// Publish HA sensor/binary state updates derived from telemetry events.
 /// Called in the events loop of fsm::handle_telemetry_frame, before the event moves.
 pub fn enqueue_event_states(state: &mut GlobalAppState, event: &TelemetryEvent) {
-    let prefix = state.mqtt_topic_prefix.clone();
     match event {
         TelemetryEvent::ShotEnded { duration } => {
             state.enqueue_absolute_mqtt_message(
-                s_topic(&prefix, "last_extraction_duration"),
+                s_topic("last_extraction_duration"),
                 duration.to_string(),
                 true,
             );
             state.enqueue_absolute_mqtt_message(
-                s_topic(&prefix, "extraction_timer"),
+                s_topic("extraction_timer"),
                 duration.to_string(),
                 true,
             );
-            state.enqueue_absolute_mqtt_message(s_topic(&prefix, "time_since_last_shot"), "0", false);
+            state.enqueue_absolute_mqtt_message(s_topic("time_since_last_shot"), "0", false);
         }
         TelemetryEvent::ShotStarted => {
-            state.enqueue_absolute_mqtt_message(s_topic(&prefix, "extraction_timer"), "0", false);
+            state.enqueue_absolute_mqtt_message(s_topic("extraction_timer"), "0", false);
         }
         TelemetryEvent::WaterRefillNeeded { .. } => {
-            state.enqueue_absolute_mqtt_message(b_topic(&prefix, "water_low"), "ON", false);
+            state.enqueue_absolute_mqtt_message(b_topic("water_low"), "ON", false);
         }
         TelemetryEvent::WaterRefillCleared => {
-            state.enqueue_absolute_mqtt_message(b_topic(&prefix, "water_low"), "OFF", false);
+            state.enqueue_absolute_mqtt_message(b_topic("water_low"), "OFF", false);
         }
         TelemetryEvent::ShotAborted { .. } | TelemetryEvent::ModeChanged { .. } => {}
     }
@@ -237,23 +235,22 @@ pub fn enqueue_event_states(state: &mut GlobalAppState, event: &TelemetryEvent) 
 /// Publish HA sensor states from the device status payload.
 /// Called alongside the existing `device_status_payload` enqueue in fsm::handle_event.
 pub fn enqueue_status_states(state: &mut GlobalAppState, info: &DeviceInfo) {
-    let prefix = state.mqtt_topic_prefix.clone();
     state.enqueue_absolute_mqtt_message(
-        s_topic(&prefix, "uptime"),
+        s_topic("uptime"),
         (info.uptime_s / 60).to_string(),
         false,
     );
     if let Some(rssi) = info.wifi_rssi {
-        state.enqueue_absolute_mqtt_message(s_topic(&prefix, "wifi_rssi"), rssi.to_string(), false);
+        state.enqueue_absolute_mqtt_message(s_topic("wifi_rssi"), rssi.to_string(), false);
     }
-    state.enqueue_absolute_mqtt_message(s_topic(&prefix, "wifi_ssid"), info.wifi_ssid.clone(), false);
+    state.enqueue_absolute_mqtt_message(s_topic("wifi_ssid"), info.wifi_ssid.clone(), false);
     if let Some(ip) = &info.ip {
-        state.enqueue_absolute_mqtt_message(s_topic(&prefix, "ip"), ip.clone(), false);
+        state.enqueue_absolute_mqtt_message(s_topic("ip"), ip.clone(), false);
     }
     if let Some(heap_b) = info.free_heap_b {
-        state.enqueue_absolute_mqtt_message(s_topic(&prefix, "free_heap"), (heap_b / 1024).to_string(), false);
+        state.enqueue_absolute_mqtt_message(s_topic("free_heap"), (heap_b / 1024).to_string(), false);
     }
     if let Some(age) = info.last_telemetry_age_s {
-        state.enqueue_absolute_mqtt_message(s_topic(&prefix, "telemetry_age"), age.to_string(), false);
+        state.enqueue_absolute_mqtt_message(s_topic("telemetry_age"), age.to_string(), false);
     }
 }
