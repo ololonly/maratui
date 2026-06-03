@@ -134,6 +134,8 @@ pub struct GlobalAppState {
     pub last_uart_frame_at: Option<Instant>,
     /// Time when the last shot ended (pump turned off after a valid extraction)
     pub last_shot_ended_at: Option<Instant>,
+    /// MQTT topic prefix (e.g. "mara"), mirrored from AppConfig for use in HA state topics
+    pub mqtt_topic_prefix: String,
     /// Board metadata (WiFi RSSI, IP, uptime, free heap)
     pub device_info: DeviceInfo,
     /// Current boot loading stage; `None` before first stage fires, frozen at 100% while waiting for machine
@@ -157,6 +159,7 @@ impl Default for GlobalAppState {
             last_activity_at: None,
             last_uart_frame_at: None,
             last_shot_ended_at: None,
+            mqtt_topic_prefix: "mara".to_string(),
             device_info: DeviceInfo::default(),
             loading_status: None,
         }

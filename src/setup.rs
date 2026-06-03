@@ -83,6 +83,7 @@ pub fn run_app(app: impl MaraUiApp) {
 
 fn run_app_hardware(mut app: impl MaraUiApp) {
     let app_config = AppConfig::from_env().expect("Invalid MARATUI_* configuration");
+    app.set_mqtt_prefix(&app_config.mqtt.topic_prefix);
     let peripherals = Peripherals::take().unwrap();
     let modem = peripherals.modem;
     let spi_p = peripherals.spi2;

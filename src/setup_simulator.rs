@@ -25,6 +25,7 @@ pub fn run_app(app: impl MaraUiApp) {
 
 fn run_app_simulator(mut app: impl MaraUiApp) {
     let app_config = AppConfig::from_env().expect("Invalid MARATUI_* configuration");
+    app.set_mqtt_prefix(&app_config.mqtt.topic_prefix);
 
     app.handle_event(AppEvent::WifiStatusChanged(ConnectionStatus::Disabled));
     app.handle_event(AppEvent::MqttStatusChanged(ConnectionStatus::Connecting));

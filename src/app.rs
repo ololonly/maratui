@@ -36,6 +36,9 @@ pub trait MaraUiApp {
     /// Drain app-generated MQTT outbound messages
     fn take_outbound_mqtt_messages(&mut self) -> Vec<MqttOutboundMessage>;
 
+    /// Mirror the MQTT topic prefix into app state (call right after AppConfig::from_env)
+    fn set_mqtt_prefix(&mut self, prefix: &str);
+
     /// Enqueue HA MQTT Discovery configs (called on MQTT connect when home-assistant is enabled)
     #[cfg(feature = "home-assistant")]
     fn enqueue_home_assistant(&mut self, topic_prefix: &str);
@@ -115,6 +118,10 @@ impl MaraUiApp for MaraUi {
 
     fn take_outbound_mqtt_messages(&mut self) -> Vec<MqttOutboundMessage> {
         self.state.take_outbound_mqtt_messages()
+    }
+
+    fn set_mqtt_prefix(&mut self, prefix: &str) {
+        self.state.mqtt_topic_prefix = prefix.to_string();
     }
 
     #[cfg(feature = "home-assistant")]
