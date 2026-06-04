@@ -1,8 +1,8 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
 use crate::config::AppConfig;
-use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::state::global_state::MqttOutboundMessage;
+use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::prelude::Size;
 use mousefood::fonts::*;
@@ -266,11 +266,7 @@ fn parse_mqtt_host_port(url: &str) -> Option<(String, u16)> {
     Some((host_port.to_string(), 1883))
 }
 
-fn publish_mqtt_message(
-    client: &mut Option<Client>,
-    cfg: &AppConfig,
-    msg: &MqttOutboundMessage,
-) {
+fn publish_mqtt_message(client: &mut Option<Client>, cfg: &AppConfig, msg: &MqttOutboundMessage) {
     let Some(client) = client.as_mut() else {
         return;
     };

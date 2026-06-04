@@ -1,8 +1,8 @@
 use crate::button::Button;
 use crate::run_app;
 use crate::screens::{Board, Connecting, Dashboard, Debug, Graphs, Screen};
-use crate::state::{AppEvent, AppStateMachine, ConnectionStatus, GlobalAppState};
 use crate::state::global_state::MqttOutboundMessage;
+use crate::state::{AppEvent, AppStateMachine, ConnectionStatus, GlobalAppState};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::Drawable;
 use mousefood::embedded_graphics::image::{Image, ImageRaw, ImageRawBE};

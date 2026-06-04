@@ -18,7 +18,7 @@ fn sensor_config(id: &str, name: &str, extra: &str) -> (String, String) {
         format!(",{extra}")
     };
     (
-        format!("homeassistant/sensor/maratui_{id}/config"),
+        format!("homeassistant/sensor/maratui/{id}/config"),
         format!(
             r#"{{"name":"{name}","unique_id":"maratui_{id}","state_topic":"homeassistant/sensor/maratui/{id}","device":{DEVICE}{extra_part}}}"#
         ),
@@ -32,7 +32,7 @@ fn binary_config(id: &str, name: &str, extra: &str) -> (String, String) {
         format!(",{extra}")
     };
     (
-        format!("homeassistant/binary_sensor/maratui_{id}/config"),
+        format!("homeassistant/binary_sensor/maratui/{id}/config"),
         format!(
             r#"{{"name":"{name}","unique_id":"maratui_{id}","state_topic":"homeassistant/binary_sensor/maratui/{id}","payload_on":"ON","payload_off":"OFF","device":{DEVICE}{extra_part}}}"#
         ),
@@ -129,7 +129,11 @@ pub fn enqueue_discovery_configs(state: &mut GlobalAppState, topic_prefix: &str)
     let binary_sensors: &[(&str, &str, &str)] = &[
         ("heating", "Heating", r#""device_class":"heat""#),
         ("pump", "Pump Active", r#""icon":"mdi:pump""#),
-        ("water_low", "Water Level Low", r#""device_class":"problem""#),
+        (
+            "water_low",
+            "Water Level Low",
+            r#""device_class":"problem""#,
+        ),
     ];
 
     for (id, name, extra) in binary_sensors {
@@ -190,11 +194,7 @@ pub fn enqueue_telemetry_states(state: &mut GlobalAppState) {
         if heating_on { "ON" } else { "OFF" },
         false,
     );
-    state.enqueue_absolute_mqtt_message(
-        b_topic("pump"),
-        if pump_on { "ON" } else { "OFF" },
-        false,
-    );
+    state.enqueue_absolute_mqtt_message(b_topic("pump"), if pump_on { "ON" } else { "OFF" }, false);
     state.enqueue_absolute_mqtt_message(
         b_topic("water_low"),
         if water_low { "ON" } else { "OFF" },
@@ -235,11 +235,7 @@ pub fn enqueue_event_states(state: &mut GlobalAppState, event: &TelemetryEvent) 
 /// Publish HA sensor states from the device status payload.
 /// Called alongside the existing `device_status_payload` enqueue in fsm::handle_event.
 pub fn enqueue_status_states(state: &mut GlobalAppState, info: &DeviceInfo) {
-    state.enqueue_absolute_mqtt_message(
-        s_topic("uptime"),
-        (info.uptime_s / 60).to_string(),
-        false,
-    );
+    state.enqueue_absolute_mqtt_message(s_topic("uptime"), (info.uptime_s / 60).to_string(), false);
     if let Some(rssi) = info.wifi_rssi {
         state.enqueue_absolute_mqtt_message(s_topic("wifi_rssi"), rssi.to_string(), false);
     }
@@ -248,7 +244,11 @@ pub fn enqueue_status_states(state: &mut GlobalAppState, info: &DeviceInfo) {
         state.enqueue_absolute_mqtt_message(s_topic("ip"), ip.clone(), false);
     }
     if let Some(heap_b) = info.free_heap_b {
-        state.enqueue_absolute_mqtt_message(s_topic("free_heap"), (heap_b / 1024).to_string(), false);
+        state.enqueue_absolute_mqtt_message(
+            s_topic("free_heap"),
+            (heap_b / 1024).to_string(),
+            false,
+        );
     }
     if let Some(age) = info.last_telemetry_age_s {
         state.enqueue_absolute_mqtt_message(s_topic("telemetry_age"), age.to_string(), false);
