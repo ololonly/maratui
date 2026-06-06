@@ -129,6 +129,8 @@ See [docs/hardware.md](docs/hardware.md) for ESP32 pinout, display wiring.
 
 Build with `--features home-assistant` to enable direct MQTT Discovery publishing from the firmware — no Node-RED or other bridge required. On every MQTT connect the firmware publishes retained discovery configs and entities appear in HA automatically.
 
+> **Prerequisites:** Home Assistant must use the same MQTT broker as the ESP32, and the MQTT integration must be enabled (Settings → Devices & Services → MQTT).
+
 See [docs/home-assistant.md](docs/home-assistant.md) for setup instructions, entity list, and cup counter configuration.
 
 ### ESP32 (flash)
