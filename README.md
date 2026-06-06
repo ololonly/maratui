@@ -127,7 +127,9 @@ See [docs/hardware.md](docs/hardware.md) for ESP32 pinout, display wiring.
 
 ### Home Assistant integration
 
-See [docs/home-assistant.md](docs/home-assistant.md) for the Node-RED bridge that maps MaraTUI MQTT topics to HA entities via MQTT Discovery.
+Build with `--features home-assistant` to enable direct MQTT Discovery publishing from the firmware — no Node-RED or other bridge required. On every MQTT connect the firmware publishes retained discovery configs and entities appear in HA automatically.
+
+See [docs/home-assistant.md](docs/home-assistant.md) for setup instructions, entity list, and cup counter configuration.
 
 ### ESP32 (flash)
 
