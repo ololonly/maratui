@@ -1,6 +1,6 @@
 [package]
 name = "maratui"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
 
 [features]
@@ -9,6 +9,8 @@ default = ["device"]
 device = ["dep:esp-idf-svc", "dep:ili9341", "dep:display-interface-spi", "dep:embuild"]
 # Build UI on host. cargo sim --target <host>
 simulator = ["dep:embedded-graphics-simulator", "dep:rumqttc"]
+# Publish HA MQTT Discovery configs and state directly from firmware (no Node-RED needed)
+home-assistant = []
 
 [dependencies]
 anyhow = "1.0.100"

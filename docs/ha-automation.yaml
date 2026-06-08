@@ -1,0 +1,41 @@
+# Home Assistant automation: Mara shot counter
+#
+# Prerequisites:
+#   1. Create a Counter helper in HA:
+#      Settings → Devices & Services → Helpers → + Create helper → Counter
+#      Name: "Mara Shots", entity_id: counter.coffee_counter
+#
+#   2. Import this automation:
+#      Settings → Automations → + Create automation → ⋮ → Edit in YAML
+#      Paste the YAML below, save, and enable.
+#
+# How it works:
+#   - Triggers on every mara/events MQTT message
+#   - Runs only when type == "shot_ended" AND duration > 20 s
+#   - Increments the counter helper
+#   - Publishes the new counter value back to mara/cup_counter (retained)
+#     so the MaraTUI display and the HA sensor both stay in sync
+#
+# If you changed MARATUI_MQTT_TOPIC_PREFIX from the default "mara",
+# replace "mara/events" and "mara/cup_counter" below accordingly.
+
+alias: Mara Shot Counter
+description: Increment espresso shot counter when a valid shot ends (duration > 20 s).
+trigger:
+  - platform: mqtt
+    topic: mara/events
+condition:
+  - condition: template
+    value_template: >
+      {{ trigger.payload_json.type == 'shot_ended'
+         and trigger.payload_json.duration | int(0) > 20 }}
+action:
+  - service: counter.increment
+    target:
+      entity_id: counter.coffee_counter
+  - service: mqtt.publish
+    data:
+      topic: mara/cup_counter
+      payload: "{{ states('counter.coffee_counter') }}"
+      retain: true
+mode: single

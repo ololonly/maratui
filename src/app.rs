@@ -1,6 +1,7 @@
 use crate::button::Button;
 use crate::run_app;
 use crate::screens::{Board, Connecting, Dashboard, Debug, Graphs, Screen};
+use crate::state::global_state::MqttOutboundMessage;
 use crate::state::{AppEvent, AppStateMachine, ConnectionStatus, GlobalAppState};
 use crate::telemetry::TelemetryFrame;
 use mousefood::embedded_graphics::Drawable;
@@ -32,8 +33,15 @@ pub trait MaraUiApp {
         true
     }
 
-    /// Drain app-generated MQTT outbound messages (`topic_suffix`, `payload`)
-    fn take_outbound_mqtt_messages(&mut self) -> Vec<(String, String)>;
+    /// Drain app-generated MQTT outbound messages
+    fn take_outbound_mqtt_messages(&mut self) -> Vec<MqttOutboundMessage>;
+
+    /// Mirror the MQTT topic prefix into app state (call right after AppConfig::from_env)
+    fn set_mqtt_prefix(&mut self, prefix: &str);
+
+    /// Enqueue HA MQTT Discovery configs (called on MQTT connect when home-assistant is enabled)
+    #[cfg(feature = "home-assistant")]
+    fn enqueue_home_assistant(&mut self, topic_prefix: &str);
 
     /// Read current network status from app state
     fn connection_statuses(&self) -> (ConnectionStatus, ConnectionStatus);
@@ -108,12 +116,17 @@ impl MaraUiApp for MaraUi {
         AppStateMachine::handle_event(&mut self.state, event);
     }
 
-    fn take_outbound_mqtt_messages(&mut self) -> Vec<(String, String)> {
-        self.state
-            .take_outbound_mqtt_messages()
-            .into_iter()
-            .map(|msg| (msg.topic_suffix, msg.payload))
-            .collect()
+    fn take_outbound_mqtt_messages(&mut self) -> Vec<MqttOutboundMessage> {
+        self.state.take_outbound_mqtt_messages()
+    }
+
+    fn set_mqtt_prefix(&mut self, prefix: &str) {
+        self.state.mqtt_topic_prefix = prefix.to_string();
+    }
+
+    #[cfg(feature = "home-assistant")]
+    fn enqueue_home_assistant(&mut self, topic_prefix: &str) {
+        crate::home_assistant::enqueue_discovery_configs(&mut self.state, topic_prefix);
     }
 
     fn backlight_active(&self) -> bool {
