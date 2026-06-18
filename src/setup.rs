@@ -13,7 +13,7 @@ use ratatui::Terminal;
 use crate::uart_reader::UartReader;
 use display_interface_spi::SPIInterface;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
-use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio27, Gpio33, InterruptType, Output, PinDriver, Pull};
+use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio22, Gpio23, InterruptType, Output, PinDriver, Pull};
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::hal::spi::{SPI2, SpiConfig, SpiDeviceDriver, SpiDriver};
 use esp_idf_svc::ipv4::{
@@ -35,18 +35,18 @@ use std::time::{Duration, Instant};
 
 type DisplayResult<'a> = anyhow::Result<
     Ili9341<
-        SPIInterface<SpiDeviceDriver<'a, SpiDriver<'a>>, PinDriver<'a, Gpio27, Output>>,
-        PinDriver<'a, Gpio33, Output>,
+        SPIInterface<SpiDeviceDriver<'a, SpiDriver<'a>>, PinDriver<'a, Gpio23, Output>>,
+        PinDriver<'a, Gpio22, Output>,
     >,
 >;
 
 fn get_ili9341<'a>(
     spi_p: SPI2,
-    dc: esp_idf_svc::hal::gpio::Gpio27,
-    mosi: esp_idf_svc::hal::gpio::Gpio23,
+    dc: esp_idf_svc::hal::gpio::Gpio23,
+    mosi: esp_idf_svc::hal::gpio::Gpio21,
     sclk: esp_idf_svc::hal::gpio::Gpio18,
-    cs: Option<esp_idf_svc::hal::gpio::Gpio25>,
-    rst: esp_idf_svc::hal::gpio::Gpio33,
+    cs: Option<esp_idf_svc::hal::gpio::Gpio19>,
+    rst: esp_idf_svc::hal::gpio::Gpio22,
 ) -> DisplayResult<'a> {
     let sdi = Option::<AnyIOPin>::None; // MISO not used for display
 
@@ -66,7 +66,7 @@ fn get_ili9341<'a>(
         di,
         rst,
         &mut esp_idf_svc::hal::delay::FreeRtos,
-        Orientation::Landscape,
+        Orientation::LandscapeFlipped,
         DisplaySize240x320,
     )
     .unwrap();
@@ -87,15 +87,15 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     let peripherals = Peripherals::take().unwrap();
     let modem = peripherals.modem;
     let spi_p = peripherals.spi2;
-    let dc = peripherals.pins.gpio27;
-    let mosi = peripherals.pins.gpio23;
+    let dc = peripherals.pins.gpio23;
+    let mosi = peripherals.pins.gpio21;
     let sclk = peripherals.pins.gpio18;
-    let cs = Some(peripherals.pins.gpio25);
-    let rst = peripherals.pins.gpio33;
+    let cs = Some(peripherals.pins.gpio19);
+    let rst = peripherals.pins.gpio22;
     let uart1 = peripherals.uart1;
     let uart_tx = peripherals.pins.gpio17;
     let uart_rx = peripherals.pins.gpio16;
-    let button1_pin = peripherals.pins.gpio32;
+    let button1_pin = peripherals.pins.gpio12;
 
     let mut display =
         get_ili9341(spi_p, dc, mosi, sclk, cs, rst).expect("Failed to initialize display");

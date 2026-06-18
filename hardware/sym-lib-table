@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "Maratui Symbols") (type "KiCad") (uri "${KIPRJMOD}/lib/symbols") (options "") (descr ""))
+)

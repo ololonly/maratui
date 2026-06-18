@@ -13,10 +13,10 @@ Target board: **ESP32 Type-C** (generic) with external **ILI9341** 240x320 TFT d
 | Display Pin | ESP32 GPIO | Notes |
 |-------------|------------|-------|
 | SCK / CLK   | GPIO18     | VSPI CLK |
-| SDA / MOSI  | GPIO23     | VSPI MOSI |
-| DC / RS     | GPIO27     | Data/Command select |
-| CS          | GPIO25     | Chip Select |
-| RST / RESET | GPIO33     | Hardware reset |
+| SDA / MOSI  | GPIO21     | VSPI MOSI |
+| DC / RS     | GPIO23     | Data/Command select |
+| CS          | GPIO19     | Chip Select |
+| RST / RESET | GPIO22     | Hardware reset |
 | LED / BLK   | GPIO14     | Backlight (driven HIGH = on) |
 | VCC         | 3.3V       | |
 | GND         | GND        | |
@@ -26,13 +26,13 @@ Target board: **ESP32 Type-C** (generic) with external **ILI9341** 240x320 TFT d
 | Function | ESP32 GPIO | Notes |
 |----------|------------|-------|
 | TX       | GPIO17     | UART1 TX |
-| RX       | GPIO16     | UART1 RX, 9600 baud 8N1 |
+| RX       | GPIO16     | UART1 RX |
 
 ### Button
 
 | Button   | ESP32 GPIO | Notes |
 |----------|------------|-------|
-| Button 1 | GPIO32     | Internal pull-up enabled |
+| Button 1 | GPIO12     | Internal pull-up enabled |
 
 Button connects GPIO to **GND** through a tactile switch (active LOW, NegEdge detection).
 Short press (< 500 ms): toggle Dashboard ↔ Graphs. Long press (≥ 500 ms): toggle Debug screen.

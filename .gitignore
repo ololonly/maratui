@@ -1,3 +1,13 @@
 /target
 /.embuild
 .env
+
+# KiCad
+hardware/**/*.bak
+hardware/**/_autosave-*
+hardware/**/*.lck
+hardware/**/~*.lck
+hardware/**/~*
+hardware/**/fp-info-cache
+hardware/.history/
+hardware/**/*:Zone.Identifier

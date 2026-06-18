@@ -134,7 +134,7 @@ Target board: **ESP32 Type-C** with an external **ILI9341** 240×320 TFT display
 | Short (on loading)| Toggle display backlight        |
 | Long              | Enter / exit Debug overlay      |
 
-See [docs/hardware.md](docs/hardware.md) for the full pinout and wiring diagram.
+See [docs/hardware.md](docs/hardware.md) for ESP32 pinout and display wiring. KiCad project, Gerbers, and renders are in [`hardware/`](hardware/).
 
 ## Security Considerations
 
@@ -146,3 +146,24 @@ See [docs/hardware.md](docs/hardware.md) for the full pinout and wiring diagram.
 ## Roadmap
 
 - Offline mode using NVS storage
+
+### Home Assistant integration
+
+See [docs/home-assistant.md](docs/home-assistant.md) for the Node-RED bridge that maps MaraTUI MQTT topics to HA entities via MQTT Discovery.
+
+### ESP32 (flash)
+
+```
+cargo run --release
+```
+
+On device startup the app:
+
+1. Reads config from `MARATUI_*` env values (embedded at build time)
+2. Connects to Wi‑Fi
+3. Starts MQTT client
+4. Publishes telemetry frames to `<MARATUI_MQTT_TOPIC_PREFIX>/telemetry`
+5. Publishes telemetry events (shot start/end, water refill, mode change) to `<MARATUI_MQTT_TOPIC_PREFIX>/events`
+6. Publishes device status (IP, RSSI, uptime, heap) to `<MARATUI_MQTT_TOPIC_PREFIX>/status`
+
+> Note: current `esp-idf-svc` MQTT API in this project exposes MQTT 3.1 / 3.1.1 protocol selection; the implementation uses 3.1.1.
