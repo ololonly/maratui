@@ -66,7 +66,7 @@ fn get_ili9341<'a>(
         di,
         rst,
         &mut esp_idf_svc::hal::delay::FreeRtos,
-        Orientation::Landscape,
+        Orientation::LandscapeFlipped,
         DisplaySize240x320,
     )
     .unwrap();
