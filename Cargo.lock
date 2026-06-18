@@ -1302,7 +1302,7 @@ dependencies = [
 
 [[package]]
 name = "maratui"
-version = "0.3.2"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "display-interface-spi",
@@ -1310,13 +1310,11 @@ dependencies = [
  "embuild",
  "esp-idf-svc",
  "ili9341",
- "libc",
  "log",
  "mousefood",
  "ratatui",
  "rumqttc",
  "strum 0.27.2",
- "strum_macros 0.27.2",
  "tui-widgets",
 ]
 

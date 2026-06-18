@@ -6,6 +6,10 @@ target = "xtensa-esp32-espidf"
 sim = "run --no-default-features --features simulator --target x86_64-unknown-linux-gnu"
 simmac = "run --no-default-features --features simulator --target aarch64-apple-darwin"
 simwin = "run --no-default-features --features simulator --target x86_64-pc-windows-msvc"
+# Simulator with HA MQTT Discovery enabled
+simha = "run --no-default-features --features simulator,home-assistant --target x86_64-unknown-linux-gnu"
+simmacHA = "run --no-default-features --features simulator,home-assistant --target aarch64-apple-darwin"
+simwinHA = "run --no-default-features --features simulator,home-assistant --target x86_64-pc-windows-msvc"
 
 [target.xtensa-esp32-espidf]
 linker = "ldproxy"

@@ -1,6 +1,8 @@
 /// Application setup.
 pub mod app;
 pub mod config;
+#[cfg(feature = "home-assistant")]
+pub mod home_assistant;
 #[cfg(not(feature = "simulator"))]
 mod setup;
 #[cfg(not(feature = "simulator"))]

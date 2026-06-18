@@ -101,20 +101,26 @@ fn render_info_col(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     let inner = block.inner(area);
     block.render(area, buf);
 
-    let [hx_area, status_area] =
-        Layout::vertical([Constraint::Fill(1), Constraint::Length(4)]).areas(inner);
-
-    // Split hx area: label+value on left, mini vertical gauge on right
-    let [hx_text_area, hx_gauge_area] =
-        Layout::horizontal([Constraint::Fill(1), Constraint::Length(2)]).areas(hx_area);
+    let [hx_label_area, hx_gauge_area, status_area] = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Fill(1),
+        Constraint::Length(4),
+    ])
+    .areas(inner);
 
     Paragraph::new(vec![
         Line::styled("HX", STYLE_DARK_GRAY),
-        Line::raw(""),
         Line::styled(format!("{}°", t_frame.hx_now_c), STYLE_CYAN),
     ])
     .centered()
-    .render(hx_text_area, buf);
+    .render(hx_label_area, buf);
+
+    let [_, hx_gauge_area, _] = Layout::horizontal([
+        Constraint::Length(1),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ])
+    .areas(hx_gauge_area);
 
     render_hx_vgauge(t_frame.hx_now_c, hx_gauge_area, buf);
 
@@ -153,7 +159,7 @@ fn render_info_col(t_frame: &TelemetryFrame, area: Rect, buf: &mut Buffer) {
     .render(status_area, buf);
 }
 
-/// Vertical mini-gauge for HX temperature.
+/// Full-width vertical gauge for HX temperature.
 ///
 /// Scale 60–110°C. Ideal zone 90–95°C is marked with `▒` even when unfilled.
 /// Colors: white (cold) → green (ideal 88–95°) → yellow (95–100°) → red (>100°).
@@ -394,6 +400,6 @@ fn shot_quality_label(secs: u64) -> &'static str {
         24..=27 => "PERFECT",
         28..=31 => "LONG SHOT",
         32..=39 => "BLONDING",
-        _ => "WTF YOU'RE DOUING?",
+        _ => "RIP SHOT",
     }
 }

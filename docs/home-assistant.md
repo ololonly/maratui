@@ -1,31 +1,45 @@
-# Home Assistant Integration via Node-RED
+# Home Assistant Integration
 
-This guide explains how to get Lelit Mara telemetry into Home Assistant using the Node-RED flow included in this repo.
+MaraTUI can publish Home Assistant MQTT Discovery configs directly from the firmware — no Node-RED or any other bridge required.
 
 ## Architecture
 
 ```
 ESP32 (MaraTUI)
     │  UART telemetry
-    └─► MQTT broker  ──────────────────────────────────┐
-            │                                          │
-            │  mara/telemetry (JSON, ~1 Hz)            │
-            │  mara/events    (JSON, on change)        │
-            └─► Node-RED flow                          │
-                    │                                  │
-                    │  MQTT Discovery + state topics   │
-                    └─► Home Assistant                 │
-                              │                        │
-                              └──────── sensors ───────┘
+    │  MQTT (homeassistant/# discovery + state)
+    └─► MQTT broker ──────────────────────────────► Home Assistant
+                                                          │
+                                                    sensors / binary sensors
+                                                    auto-registered via Discovery
 ```
 
-The Node-RED flow acts as a bridge: it subscribes to the raw MaraTUI topics, transforms the data, and publishes Home Assistant MQTT Discovery configs so entities appear automatically — no manual YAML required.
+On connect, the firmware publishes retained discovery configs to `homeassistant/sensor/maratui_*/config` and `homeassistant/binary_sensor/maratui_*/config`. Home Assistant picks them up automatically — no manual YAML needed.
 
 ## Prerequisites
 
-- MQTT broker reachable by both the ESP32 and the machine running Node-RED (e.g. Mosquitto on the same host as HA)
-- Node-RED with the `node-red-contrib-mqtt-broker` palette (bundled in most HA Node-RED add-ons)
-- Home Assistant with the MQTT integration enabled
+- MQTT broker reachable by both the ESP32 and Home Assistant (e.g. Mosquitto on the same host)
+- Home Assistant with the MQTT integration enabled (Settings → Devices & Services → MQTT)
+
+## Enabling HA Discovery
+
+Add `--features home-assistant` to your build command:
+
+**Flash to device:**
+```bash
+cargo run --release --features home-assistant
+# or
+make flash-ha
+```
+
+**Run the simulator:**
+```bash
+cargo simha          # Linux
+cargo simmacHA       # macOS
+make sim-ha          # auto-detects OS
+```
+
+That's it — on first MQTT connect the firmware publishes all discovery configs, and entities appear in HA within seconds.
 
 ## MQTT Topics Published by MaraTUI
 
@@ -33,11 +47,11 @@ The Node-RED flow acts as a bridge: it subscribes to the raw MaraTUI topics, tra
 
 ```json
 {
-  "mode": "E",
-  "sw": "1.1",
-  "boiler_now_c": 93.5,
-  "boiler_target_c": 94.0,
-  "hx_now_c": 91.2,
+  "mode": "Coffee",
+  "sw": "1.10",
+  "boiler_now_c": 93,
+  "boiler_target_c": 94,
+  "hx_now_c": 91,
   "boost_countdown_s": 0,
   "heating_on": false,
   "pump_on": false,
@@ -45,66 +59,55 @@ The Node-RED flow acts as a bridge: it subscribes to the raw MaraTUI topics, tra
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `mode` | string | Machine operating mode (`E` = espresso, `S` = steam, etc.) |
-| `sw` | string | Firmware version string from machine |
-| `boiler_now_c` | float | Current boiler temperature, °C |
-| `boiler_target_c` | float \| null | Boiler setpoint, °C; null when unavailable |
-| `hx_now_c` | float | Heat exchanger temperature, °C |
-| `boost_countdown_s` | int | Seconds remaining in boost mode (0 = inactive) |
-| `heating_on` | bool | Heating element active |
-| `pump_on` | bool | Pump active (shot in progress) |
-| `no_water_code` | int \| null | Non-null when water reservoir is low |
-
-The topic prefix defaults to `mara` and is set via `MARATUI_MQTT_TOPIC_PREFIX` in `.env`.
-
 ### `<prefix>/events` — on-change JSON events
 
 | `type` | Extra fields | Description |
 |---|---|---|
 | `shot_started` | — | Pump just turned on |
 | `shot_ended` | `duration` (int, seconds) | Pump turned off; duration of the shot |
+| `shot_aborted` | `duration` (int, seconds) | Pump ran < 10 s (rinse / pre-heat kick) |
 | `water_refill_needed` | `code` (int) | Water low detected |
 | `water_refill_cleared` | — | Water low cleared |
 | `mode_changed` | `from`, `to` (strings) | Machine mode transition |
 
-## Importing the Node-RED Flow
+### `<prefix>/status` — periodic device info (~30 s)
 
-1. Open Node-RED (usually `http://<ha-host>:1880`).
-2. Click the hamburger menu → **Import**.
-3. Paste or upload `docs/node-red-ha-bridge.json`.
-4. Click **Import**, then **Deploy**.
+```json
+{
+  "uptime_s": 3600,
+  "wifi_ssid": "MyNetwork",
+  "wifi_rssi": -62,
+  "ip": "192.168.1.42",
+  "free_heap_b": 180000,
+  "last_telemetry_age_s": 1
+}
+```
 
-On deploy the flow immediately publishes MQTT Discovery configs (retained), so entities appear in HA within a few seconds.
-
-## Configuring the MQTT Broker
-
-The imported flow uses a broker node named **Local MQTT** pointing to `localhost:1883`. If your broker lives elsewhere:
-
-1. Double-click any MQTT node in the flow.
-2. Click the pencil icon next to the broker field.
-3. Update **Server** and **Port**.
-4. Click **Update** → **Done** → **Deploy**.
-
-If your broker requires authentication, fill in **Username** / **Password** in the same broker config dialog.
+The topic prefix defaults to `mara` and is configured via `MARATUI_MQTT_TOPIC_PREFIX` in `.env`.
 
 ## Home Assistant Entities
 
-The flow registers the following entities under a single device named **Lelit Mara**:
+All entities appear under a single device named **Lelit Mara**.
 
 ### Sensors
 
 | Entity | Unit | Notes |
 |---|---|---|
-| Mode | — | Operating mode character |
-| Firmware Version | — | Diagnostic entity |
+| Mode | — | Operating mode |
+| Firmware Version | — | Diagnostic |
 | Boiler Temperature | °C | `device_class: temperature` |
 | Boiler Target | °C | `device_class: temperature` |
 | HX Temperature | °C | `device_class: temperature` |
-| Last Extraction Duration | s | Updated on shot end, retained |
+| Last Extraction Duration | s | Retained; updated on shot end |
 | Extraction Timer | s | Live counter during shot |
 | Time Since Last Shot | min | Minutes since pump last stopped |
+| Cup Counter | — | See cup counter setup below |
+| Uptime | min | Diagnostic |
+| Wi-Fi RSSI | dBm | Diagnostic |
+| Wi-Fi SSID | — | Diagnostic |
+| IP Address | — | Diagnostic |
+| Free Heap | kB | Diagnostic |
+| Telemetry Age | s | Diagnostic |
 
 ### Binary Sensors
 
@@ -114,31 +117,55 @@ The flow registers the following entities under a single device named **Lelit Ma
 | Pump Active | On while shot is in progress |
 | Water Level Low | `device_class: problem` |
 
-## How the Flow Works
+## Cup Counter Setup
+
+The cup counter requires a short one-time setup in Home Assistant. The counter value is stored as an HA helper and published back to the broker so the MaraTUI display stays in sync.
+
+### 1. Create a Counter helper
+
+Settings → Devices & Services → Helpers → **+ Create helper** → **Counter**
+
+- Name: `Mara Shots`
+- Entity ID: `counter.coffee_counter` (default)
+- Initial value: your current count (or 0)
+
+### 2. Import the automation
+
+Settings → Automations → **+ Create automation** → ⋮ menu → **Edit in YAML**
+
+Paste the contents of `docs/ha-automation.yaml`, save, and enable.
+
+The automation triggers on `mara/events` when `type == shot_ended` and `duration > 20 s`, increments the helper, and publishes the new value to `mara/cup_counter` (retained) so both the HA sensor and the ESP32 display update.
+
+### Cup counter flow
 
 ```
-[Inject on deploy] → [Build HA Discovery] → [MQTT out]
-[mara/telemetry]   → [Parse Telemetry]   → [MQTT out]
-[mara/events]      → [Handle Events]     → [MQTT out]
+MaraTUI → mara/events {"type":"shot_ended","duration":35}
+               ↓
+         HA automation (ha-automation.yaml)
+         duration > 20 s → counter.increment(counter.coffee_counter)
+                         → mqtt.publish(mara/cup_counter, retained)
+               ↓
+         ESP32 subscribes to mara/cup_counter → display updates
+         HA sensor maratui_cup_counter reads mara/cup_counter → HA updates
 ```
-
-**Build HA Discovery** — runs once 2 s after deploy. Publishes retained config payloads to `homeassistant/sensor/maratui_*/config` and `homeassistant/binary_sensor/maratui_*/config`.
-
-**Parse Telemetry** — runs on every telemetry frame. Maintains a node context to compute the live extraction timer (seconds since `pump_on` became true) and reads a flow-level `last_shot_end` timestamp set by the events handler to compute time-since-last-shot.
-
-**Handle Events** — runs on every event. Persists `last_extraction_duration` as a retained state, resets the extraction timer to 0 on `shot_started`, and syncs the water-low binary sensor directly from events (more reliable than polling the telemetry field).
 
 ## Troubleshooting
 
 **Entities don't appear in HA**
-- Confirm the MQTT integration is enabled in HA (Settings → Devices & Services → MQTT).
-- Check that the broker Node-RED connects to is the same one HA listens on.
-- Re-click the **Publish Discovery** inject node manually to resend configs.
+- Check that the MQTT integration is enabled (Settings → Devices & Services → MQTT).
+- Confirm the broker MaraTUI connects to is the same one HA uses.
+- Subscribe to `homeassistant/#` with `mosquitto_sub -t 'homeassistant/#' -v` to verify discovery configs are arriving.
+- Power-cycle or reconnect the ESP32 — discovery configs are re-sent on every MQTT connect.
 
 **Values don't update**
 - Confirm the ESP32 is connected to Wi-Fi and MQTT (`MARATUI_MQTT_ENABLED=true` in `.env`).
 - Check the MaraTUI Debug screen for UART activity and connection status.
-- In Node-RED, add a **debug** node after `mqtt in` to see raw messages.
+- Subscribe to `mara/#` to see raw messages from the device.
 
 **Topic mismatch**
-- The flow subscribes to `mara/telemetry` and `mara/events`. If you changed `MARATUI_MQTT_TOPIC_PREFIX`, update the topic fields in both `mqtt in` nodes.
+- If you set `MARATUI_MQTT_TOPIC_PREFIX` to something other than `mara`, update the topics in `docs/ha-automation.yaml` accordingly.
+
+**Cup counter not incrementing**
+- Verify the automation is enabled and the trigger topic matches your prefix.
+- Check HA automation traces (Settings → Automations → Mara Shot Counter → ⋮ → Traces).
