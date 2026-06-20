@@ -21,7 +21,7 @@ Target board: **ESP32 Type-C** (generic) with external **ILI9341** 240x320 TFT d
 | VCC         | 3.3V       | |
 | GND         | GND        | |
 
-### UART (Lelit Mara telemetry)
+### UART (Lelit Mara X telemetry)
 
 | Function | ESP32 GPIO | Notes |
 |----------|------------|-------|

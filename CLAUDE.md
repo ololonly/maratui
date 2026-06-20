@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-MaraTUI is an embedded Rust TUI application for the **Lelit Mara** espresso machine. It runs on an ESP32 microcontroller driving an ILI9341 320×240 display via SPI, reads telemetry from the machine over UART, and publishes events to MQTT. A host simulator mode exists for UI development without hardware.
+MaraTUI is an embedded Rust TUI application for the **Lelit Mara X** espresso machine. It runs on an ESP32 microcontroller driving an ILI9341 320×240 display via SPI, reads telemetry from the machine over UART, and publishes events to MQTT. A host simulator mode exists for UI development without hardware.
 
 ## Build Targets and Features
 

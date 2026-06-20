@@ -87,7 +87,7 @@ The topic prefix defaults to `mara` and is configured via `MARATUI_MQTT_TOPIC_PR
 
 ## Home Assistant Entities
 
-All entities appear under a single device named **Lelit Mara**.
+All entities appear under a single device named **Lelit Mara X**.
 
 ### Sensors
 

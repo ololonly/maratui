@@ -1,6 +1,6 @@
 # MaraTUI PCB
 
-Custom ESP32 controller board for the [Lelit Mara](https://lelitcoffee.com/product/mara-x/) espresso machine.
+Custom ESP32 controller board for the [Lelit Mara X](https://lelitcoffee.com/product/mara-x/) espresso machine.
 
 ## PCB Renders
 
@@ -33,7 +33,7 @@ Custom ESP32 controller board for the [Lelit Mara](https://lelitcoffee.com/produ
 | VCC         | 3.3V       | |
 | GND         | GND        | |
 
-### UART (Lelit Mara telemetry)
+### UART (Lelit Mara X telemetry)
 
 | Function | ESP32 GPIO | Notes |
 |----------|------------|-------|

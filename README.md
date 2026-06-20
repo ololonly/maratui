@@ -8,7 +8,7 @@
 
 # MaraTUI
 
-An embedded Rust TUI application for the **Lelit Mara** espresso machine. Runs on an **ESP32** microcontroller driving an **ILI9341 320×240 display** over SPI, reads machine telemetry over UART, and publishes events to MQTT. Includes a host simulator mode for UI development without any hardware.
+An embedded Rust TUI application for the **Lelit Mara X** espresso machine. Runs on an **ESP32** microcontroller driving an **ILI9341 320×240 display** over SPI, reads machine telemetry over UART, and publishes events to MQTT. Includes a host simulator mode for UI development without any hardware.
 
 ## Screenshots
 

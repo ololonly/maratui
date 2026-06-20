@@ -1,7 +1,7 @@
 use crate::state::global_state::{DeviceInfo, GlobalAppState};
 use crate::telemetry::AppEvent as TelemetryEvent;
 
-const DEVICE: &str = r#"{"identifiers":["maratui_esp32"],"name":"Lelit Mara","model":"MaraTUI","manufacturer":"Lelit"}"#;
+const DEVICE: &str = r#"{"identifiers":["maratui_esp32"],"name":"Lelit Mara X","model":"MaraTUI","manufacturer":"Lelit"}"#;
 
 fn s_topic(id: &str) -> String {
     format!("homeassistant/sensor/maratui/{id}")
