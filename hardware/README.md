@@ -1,6 +1,12 @@
 # MaraTUI PCB
 
-Custom ESP32 controller board for the Lelit Mara espresso machine.
+Custom ESP32 controller board for the [Lelit Mara](https://lelitcoffee.com/product/mara-x/) espresso machine.
+
+## PCB Renders
+
+| Front | Back |
+|:-----:|:----:|
+| ![PCB front](renders/front.png) | ![PCB back](renders/back.png) |
 
 ## Components
 
@@ -11,6 +17,39 @@ Custom ESP32 controller board for the Lelit Mara espresso machine.
 | SW1 | Tactile switch | |
 | J1 | Barrel jack (power) | |
 | J2 | 3-pin connector (GND + UART) | |
+
+## Wiring
+
+### SPI Display (ILI9341)
+
+| Display Pin | ESP32 GPIO | Notes |
+|-------------|------------|-------|
+| SCK / CLK   | GPIO18     | VSPI CLK |
+| SDA / MOSI  | GPIO21     | VSPI MOSI |
+| DC / RS     | GPIO23     | Data/Command select |
+| CS          | GPIO19     | Chip Select |
+| RST / RESET | GPIO22     | Hardware reset |
+| LED / BLK   | GPIO14     | Backlight (HIGH = on) |
+| VCC         | 3.3V       | |
+| GND         | GND        | |
+
+### UART (Lelit Mara telemetry)
+
+| Function | ESP32 GPIO | Notes |
+|----------|------------|-------|
+| TX       | GPIO17     | UART1 TX |
+| RX       | GPIO16     | UART1 RX |
+
+### Button
+
+| Button   | ESP32 GPIO | Notes |
+|----------|------------|-------|
+| SW1      | GPIO12     | Internal pull-up enabled |
+
+Button connects GPIO to **GND** via a tactile switch (active LOW, falling-edge detection).
+
+- Short press (< 500 ms): cycle screens (Dashboard ↔ Graphs)
+- Long press (≥ 500 ms): toggle Debug screen
 
 ## Custom Libraries
 
@@ -23,9 +62,8 @@ Non-standard components are bundled in `lib/` so the project opens without missi
 | `lib/footprints/maratui.pretty/ESP32_30pin.kicad_mod` | ESP32 footprint |
 | `lib/footprints/maratui.pretty/TFT-320x240.kicad_mod` | TFT display footprint |
 
-
 ## Manufacturing
 
-Gerber files for fabrication: `gerbers/maratui-v1.0.zip`
+Gerber files for fabrication: `gerbers/maratui-v1.zip`
 
 Tested with JLCPCB default 2-layer settings.
