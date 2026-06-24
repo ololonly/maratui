@@ -1,7 +1,6 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonState};
 use crate::config::AppConfig;
-use crate::screens::Screen;
 use crate::state::global_state::MqttOutboundMessage;
 use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::telemetry::TelemetryFrame;
@@ -192,30 +191,17 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     let mut last_wifi_check_at: Option<Instant> = None;
     let mut wifi_reconnect_at: Option<Instant> = None;
     let mut wifi_was_connected = true;
-    let mut prev_had_telemetry = false;
 
     loop {
         app.tick();
 
         button1_state.update(button1.is_low(), |press_type| {
-            let was_on_loading = !app.has_telemetry() && app.current_screen() != Screen::Debug;
             app.handle_press(Button::Button1(press_type));
-            if was_on_loading && app.current_screen() == Screen::Debug {
-                terminal.clear().unwrap();
-            }
         });
 
         while let Ok(telemetry) = rx.try_recv() {
             app.update_telemetry(telemetry);
         }
-
-        // Clear terminal once when the first UART frame arrives so the loading
-        // screen (rat image + connecting block) is fully overwritten.
-        let now_has_telemetry = app.has_telemetry();
-        if !prev_had_telemetry && now_has_telemetry {
-            terminal.clear().unwrap();
-        }
-        prev_had_telemetry = now_has_telemetry;
 
         if let Some(cup_counter_rx) = cup_counter_rx.as_mut() {
             while let Ok(cups) = cup_counter_rx.try_recv() {
@@ -306,6 +292,12 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
             backlight.set_high().unwrap();
         } else {
             backlight.set_low().unwrap();
+        }
+
+        // Apply any pending full clear requested by the state machine (new session, Debug
+        // toggle) so accumulated display artifacts are wiped before the next frame.
+        if app.take_redraw_request() {
+            terminal.clear().unwrap();
         }
 
         app.render_image(terminal.backend_mut().display_mut());

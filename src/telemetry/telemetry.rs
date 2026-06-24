@@ -250,6 +250,23 @@ impl Default for MachineState {
 }
 
 impl MachineState {
+    /// Reset all per-session derived state so a resumed machine starts from a clean slate.
+    ///
+    /// Clears the graph buffers (so the chart restarts instead of jumping down from stale
+    /// data) and drops `last_frame`/`shot_started_at` so the resuming frame is treated as a
+    /// fresh start and cannot emit spurious mode/shot transition events.
+    pub fn reset_session(&mut self) {
+        self.last_frame = None;
+        self.shot_started_at = None;
+        self.last_graph_sample_at = None;
+        self.target_boiler_data.clear();
+        self.current_boiler_data.clear();
+        self.current_hx_data.clear();
+        self.graph_boiler_current.clear();
+        self.graph_boiler_target.clear();
+        self.graph_hx.clear();
+    }
+
     /// Rebuild the cached graph point slices from the rolling VecDeque buffers.
     /// Uses clear()+extend() to reuse heap allocation after the first call.
     pub fn rebuild_graph_points(&mut self) {

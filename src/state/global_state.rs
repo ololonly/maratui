@@ -9,6 +9,12 @@ use std::{
 // timeout is unnecessary — consider removing BACKLIGHT_TIMEOUT and backlight_should_be_on entirely.
 pub const BACKLIGHT_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// How long telemetry may be absent before the machine is considered offline.
+///
+/// Once this elapses with no UART frame, the UI falls back to the waiting screen and
+/// the next frame to arrive starts a fresh session (terminal + graph buffers cleared).
+pub const MACHINE_OFFLINE_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum ConnectionStatus {
     Disabled,
@@ -140,6 +146,9 @@ pub struct GlobalAppState {
     pub device_info: DeviceInfo,
     /// Current boot loading stage; `None` before first stage fires, frozen at 100% while waiting for machine
     pub loading_status: Option<(&'static str, u8)>,
+    /// Set by the state machine to ask the render loop for a full `terminal.clear()`
+    /// (new session, Debug toggle). Drained once per frame via `take_redraw_request`.
+    pub needs_terminal_clear: bool,
 }
 
 impl Default for GlobalAppState {
@@ -162,6 +171,7 @@ impl Default for GlobalAppState {
             mqtt_topic_prefix: "mara".to_string(),
             device_info: DeviceInfo::default(),
             loading_status: None,
+            needs_terminal_clear: false,
         }
     }
 }
@@ -234,6 +244,25 @@ impl GlobalAppState {
             Some(last) => now.saturating_duration_since(last) < BACKLIGHT_TIMEOUT,
             None => false,
         }
+    }
+
+    /// Returns `true` while telemetry is fresh enough to consider the machine online
+    /// (a UART frame arrived within the last `MACHINE_OFFLINE_TIMEOUT`).
+    pub fn machine_online(&self, now: Instant) -> bool {
+        match self.last_uart_frame_at {
+            Some(last) => now.saturating_duration_since(last) < MACHINE_OFFLINE_TIMEOUT,
+            None => false,
+        }
+    }
+
+    /// Ask the render loop to perform a full `terminal.clear()` on the next frame.
+    pub fn request_redraw(&mut self) {
+        self.needs_terminal_clear = true;
+    }
+
+    /// Consume a pending redraw request, returning whether the terminal should be cleared.
+    pub fn take_redraw_request(&mut self) -> bool {
+        std::mem::take(&mut self.needs_terminal_clear)
     }
 }
 
