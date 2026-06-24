@@ -79,10 +79,13 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
     let boot_time = Instant::now();
     let mut last_status_at: Option<Instant> = None;
 
-    let mut prev_had_telemetry = false;
-
     loop {
         app.tick();
+
+        // Apply any pending full clear requested by the state machine (new session, Debug toggle).
+        if app.take_redraw_request() {
+            terminal.clear().unwrap();
+        }
 
         app.render_image(terminal.backend_mut().display_mut());
         terminal
@@ -90,13 +93,6 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                 app.draw(f);
             })
             .unwrap();
-
-        // Clear terminal once when the first UART frame arrives
-        let now_has_telemetry = app.has_telemetry();
-        if !prev_had_telemetry && now_has_telemetry {
-            terminal.clear().unwrap();
-        }
-        prev_had_telemetry = now_has_telemetry;
 
         for event in simulator_window.borrow_mut().events() {
             match event {
@@ -109,29 +105,16 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                     }
                     match keycode {
                         Keycode::Right | Keycode::Left => {
-                            terminal.clear().unwrap();
                             app.handle_press(Button::Button1(ButtonPressType::Short));
                         }
                         Keycode::Up => {
-                            let had = app.has_telemetry();
                             app.update_telemetry(TelemetryFrame::debug_pump_on_frame());
-                            if !had && app.has_telemetry() {
-                                terminal.clear().unwrap();
-                            }
                         }
                         Keycode::Down => {
-                            let had = app.has_telemetry();
                             app.update_telemetry(TelemetryFrame::debug_frame());
-                            if !had && app.has_telemetry() {
-                                terminal.clear().unwrap();
-                            }
                         }
                         Keycode::Space => {
-                            let had = app.has_telemetry();
                             app.update_telemetry(TelemetryFrame::debug_no_water_frame());
-                            if !had && app.has_telemetry() {
-                                terminal.clear().unwrap();
-                            }
                         }
                         Keycode::M => {
                             app.handle_event(AppEvent::PublishMqttEvent {
@@ -140,7 +123,6 @@ fn run_app_simulator(mut app: impl MaraUiApp) {
                             });
                         }
                         Keycode::D => {
-                            terminal.clear().unwrap();
                             app.handle_press(Button::Button1(ButtonPressType::Long));
                         }
                         _ => {}

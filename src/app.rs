@@ -36,6 +36,10 @@ pub trait MaraUiApp {
     /// Drain app-generated MQTT outbound messages
     fn take_outbound_mqtt_messages(&mut self) -> Vec<MqttOutboundMessage>;
 
+    /// Returns `true` once if the render loop should clear the terminal this frame
+    /// (new session or Debug toggle). Consumes the request.
+    fn take_redraw_request(&mut self) -> bool;
+
     /// Mirror the MQTT topic prefix into app state (call right after AppConfig::from_env)
     fn set_mqtt_prefix(&mut self, prefix: &str);
 
@@ -85,10 +89,10 @@ impl MaraUiApp for MaraUi {
     fn draw(&self, frame: &mut Frame) {
         let area = frame.area();
 
-        // Show connecting screen until first UART frame arrives.
+        // Show the waiting screen until the machine is online — both before the first UART
+        // frame and after telemetry goes stale (machine switched off).
         // Debug screen is always accessible for diagnostics.
-        if self.state.machine_state.last_frame.is_none()
-            && self.state.current_screen != Screen::Debug
+        if !self.state.machine_online(Instant::now()) && self.state.current_screen != Screen::Debug
         {
             Connecting::render(&self.state, area, frame);
             return;
@@ -118,6 +122,10 @@ impl MaraUiApp for MaraUi {
 
     fn take_outbound_mqtt_messages(&mut self) -> Vec<MqttOutboundMessage> {
         self.state.take_outbound_mqtt_messages()
+    }
+
+    fn take_redraw_request(&mut self) -> bool {
+        self.state.take_redraw_request()
     }
 
     fn set_mqtt_prefix(&mut self, prefix: &str) {
@@ -163,8 +171,8 @@ impl MaraUiApp for MaraUi {
         D: DrawTarget<Color = Rgb565> + OriginDimensions,
         D::Error: core::fmt::Debug,
     {
-        // Render rat barista only during connecting/loading phase
-        let is_connecting = self.state.machine_state.last_frame.is_none()
+        // Render rat barista whenever the waiting screen is shown (machine offline)
+        let is_connecting = !self.state.machine_online(Instant::now())
             && self.state.current_screen != Screen::Debug;
 
         if !is_connecting {

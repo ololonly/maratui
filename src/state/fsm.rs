@@ -1,5 +1,6 @@
 use log::{error, info};
 
+use super::global_state::MACHINE_OFFLINE_TIMEOUT;
 use super::{AppError, AppEvent, ConnectionStatus, DeviceInfo, ExtractionState, GlobalAppState};
 use crate::button::{Button, ButtonPressType};
 #[cfg(feature = "home-assistant")]
@@ -78,6 +79,9 @@ impl AppStateMachine {
                     state.screen_before_debug = Some(state.current_screen);
                     state.current_screen = Screen::Debug;
                 }
+                // Debug uses a full-screen layout unrelated to the normal screens; clear so
+                // nothing from the previous layout lingers.
+                state.request_redraw();
             }
 
             AppEvent::ErrorOccurred { error } => {
@@ -164,7 +168,16 @@ impl AppStateMachine {
         }
 
         // Normal operation after first UART frame arrives.
-        state.last_activity_at = Some(Instant::now());
+        let now = Instant::now();
+        let backlight_was_on = state.backlight_should_be_on(now);
+        state.last_activity_at = Some(now);
+
+        // If the screen was dark (backlight timed out), the first press only wakes the
+        // backlight and must not also switch screens.
+        if !backlight_was_on {
+            return;
+        }
+
         if let Button::Button1(ButtonPressType::Short) = button
             && state.current_screen != Screen::Debug
         {
@@ -175,6 +188,18 @@ impl AppStateMachine {
     /// Handle telemetry frame updates
     pub fn handle_telemetry_frame(state: &mut GlobalAppState, frame: TelemetryFrame, now: Instant) {
         state.enqueue_mqtt_message("telemetry", telemetry_payload(&frame));
+
+        // A new session starts on the very first frame, or when telemetry resumes after the
+        // machine has been offline (long UART gap). Reset per-session state and ask the render
+        // loop to clear the terminal so any accumulated display artifacts are wiped.
+        let new_session = state
+            .last_uart_frame_at
+            .map(|t| now.saturating_duration_since(t) >= MACHINE_OFFLINE_TIMEOUT)
+            .unwrap_or(true);
+        if new_session {
+            state.machine_state.reset_session();
+            state.request_redraw();
+        }
 
         // frame moves into update_state_with_events; it is stored in state.machine_state.last_frame
         let (_snapshot, events) = update_state_with_events(&mut state.machine_state, frame, now);
@@ -302,6 +327,7 @@ fn telemetry_event_payload(event: &crate::telemetry::AppEvent) -> String {
 mod tests {
     use super::*;
     use crate::screens::Screen;
+    use crate::state::global_state::BACKLIGHT_TIMEOUT;
     use std::time::Duration;
 
     #[test]
@@ -388,11 +414,62 @@ mod tests {
         let mut state = GlobalAppState::default();
         // Navigation is blocked until first telemetry arrives
         state.machine_state.last_frame = Some(TelemetryFrame::debug_frame());
+        // Backlight must be on for a press to switch screens
+        state.last_activity_at = Some(Instant::now());
         let initial_screen = state.current_screen;
 
         AppStateMachine::handle_button_press(&mut state, Button::Button1(ButtonPressType::Short));
 
         assert_eq!(state.current_screen, initial_screen.next());
+    }
+
+    #[test]
+    fn test_press_while_dark_only_wakes_backlight() {
+        let mut state = GlobalAppState::default();
+        state.machine_state.last_frame = Some(TelemetryFrame::debug_frame());
+        // Backlight timed out (last activity well in the past)
+        state.last_activity_at = Some(Instant::now() - BACKLIGHT_TIMEOUT - Duration::from_secs(1));
+        let initial_screen = state.current_screen;
+
+        AppStateMachine::handle_button_press(&mut state, Button::Button1(ButtonPressType::Short));
+
+        // First press only wakes the backlight: screen must not change, activity refreshed
+        assert_eq!(state.current_screen, initial_screen);
+        assert!(state.backlight_should_be_on(Instant::now()));
+
+        // Second press (backlight now on) switches screens
+        AppStateMachine::handle_button_press(&mut state, Button::Button1(ButtonPressType::Short));
+        assert_eq!(state.current_screen, initial_screen.next());
+    }
+
+    #[test]
+    fn test_telemetry_resume_starts_new_session() {
+        let mut state = GlobalAppState::default();
+        let t0 = Instant::now();
+
+        // First frame: a shot runs and is sampled into the graph buffers.
+        let on = TelemetryFrame::debug_pump_on_frame();
+        AppStateMachine::handle_telemetry_frame(&mut state, on, t0);
+        assert!(state.take_redraw_request(), "first frame starts a session");
+        assert!(!state.machine_state.current_boiler_data.is_empty());
+
+        // Telemetry resumes after the machine was offline: buffers reset, redraw requested,
+        // and no spurious shot-end event is logged from the stale pump-on frame.
+        let events_before = state.events_log.len();
+        let resume = TelemetryFrame::debug_frame();
+        AppStateMachine::handle_telemetry_frame(
+            &mut state,
+            resume,
+            t0 + MACHINE_OFFLINE_TIMEOUT + Duration::from_secs(1),
+        );
+        assert!(state.take_redraw_request(), "resume starts a new session");
+        // Exactly one fresh sample after the reset (no stale history)
+        assert_eq!(state.machine_state.current_boiler_data.len(), 1);
+        assert_eq!(
+            state.events_log.len(),
+            events_before,
+            "no phantom transition events on resume"
+        );
     }
 
     #[test]
