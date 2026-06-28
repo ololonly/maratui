@@ -71,7 +71,7 @@ impl Board for Debug {
             .map(|t| format!("{}s", now.saturating_duration_since(t).as_secs()))
             .unwrap_or_else(|| "?".to_string());
         let dev_text2 = format!(
-            "     ip={} up={} heap={} rx={}",
+            "ip={} up={} heap={} rx={}",
             ip_str,
             format_uptime(dev.uptime_s),
             heap_str,
