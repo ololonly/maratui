@@ -188,24 +188,22 @@ fn render_hx_vgauge(temp: u16, area: Rect, buf: &mut Buffer) {
     };
 
     let w = area.width as usize;
-    let fill = "█".repeat(w);
-    let empty = "░".repeat(w);
-    let ideal = "▒".repeat(w);
-
     for row in 0..total {
         let y = area.y + row as u16;
         let is_filled = row >= total.saturating_sub(filled);
         let in_ideal = row >= ideal_top_row && row < ideal_bot_row;
 
-        let (s, style) = if is_filled {
-            (fill.as_str(), fill_style)
+        let (ch, style) = if is_filled {
+            ("█", fill_style)
         } else if in_ideal {
-            (ideal.as_str(), STYLE_GREEN)
+            ("▒", STYLE_GREEN)
         } else {
-            (empty.as_str(), STYLE_DARK_GRAY)
+            ("░", STYLE_DARK_GRAY)
         };
 
-        buf.set_string(area.x, y, s, style);
+        for x in 0..w {
+            buf.set_string(area.x + x as u16, y, ch, style);
+        }
     }
 }
 
@@ -297,16 +295,17 @@ fn render_shot_gauge(state: &GlobalAppState, area: Rect, buf: &mut Buffer) {
     let ratio = (extraction_secs as f64 / SHOT_GAUGE_MAX_SECS as f64).min(1.0);
     let filled = (ratio * total as f64).round() as usize;
     let fill_style = shot_style(extraction_secs, state.extraction_state.is_extracting());
-    let fill: String = "█".repeat(inner.width as usize);
-    let empty: String = "░".repeat(inner.width as usize);
-
+    let w = inner.width as usize;
     for row in 0..total {
         let y = inner.y + row as u16;
         let is_filled = row >= total.saturating_sub(filled);
-        if is_filled {
-            buf.set_string(inner.x, y, &fill, fill_style);
+        let (ch, style) = if is_filled {
+            ("█", fill_style)
         } else {
-            buf.set_string(inner.x, y, &empty, STYLE_DARK_GRAY);
+            ("░", STYLE_DARK_GRAY)
+        };
+        for x in 0..w {
+            buf.set_string(inner.x + x as u16, y, ch, style);
         }
     }
 }

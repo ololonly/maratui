@@ -9,6 +9,8 @@ use std::{
 // timeout is unnecessary — consider removing BACKLIGHT_TIMEOUT and backlight_should_be_on entirely.
 pub const BACKLIGHT_TIMEOUT: Duration = Duration::from_secs(10);
 
+const EVENTS_LOG_MAX: usize = 10;
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum ConnectionStatus {
     Disabled,
@@ -148,7 +150,7 @@ impl Default for GlobalAppState {
             current_screen: Screen::default(),
             extraction_state: ExtractionState::default(),
             machine_state: MachineState::default(),
-            events_log: VecDeque::with_capacity(10),
+            events_log: VecDeque::with_capacity(EVENTS_LOG_MAX),
             wifi_status: ConnectionStatus::default(),
             mqtt_status: ConnectionStatus::default(),
             cup_counter: None,
@@ -221,6 +223,13 @@ impl GlobalAppState {
         });
         while self.outbound_mqtt.len() > 64 {
             self.outbound_mqtt.pop_front();
+        }
+    }
+
+    pub fn push_event_log(&mut self, entry: String) {
+        self.events_log.push_front(entry);
+        if self.events_log.len() > EVENTS_LOG_MAX {
+            self.events_log.pop_back();
         }
     }
 

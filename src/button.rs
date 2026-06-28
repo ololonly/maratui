@@ -67,14 +67,11 @@ impl ButtonState {
             // Button just released
             let duration = pressed_at.elapsed().as_millis() as u64;
             let press_type = if duration < 500 {
-                Some(ButtonPressType::Short)
+                ButtonPressType::Short
             } else {
-                Some(ButtonPressType::Long)
+                ButtonPressType::Long
             };
-
-            if let Some(press_type) = press_type {
-                on_press(press_type);
-            }
+            on_press(press_type);
         }
     }
 }

@@ -1,6 +1,7 @@
 use crate::app::MaraUiApp;
 use crate::button::{Button, ButtonPressType};
 use crate::config::AppConfig;
+use log::warn;
 use crate::state::global_state::MqttOutboundMessage;
 use crate::state::{AppEvent, ConnectionStatus, DeviceInfo};
 use crate::telemetry::TelemetryFrame;
@@ -225,7 +226,9 @@ fn init_simulator_mqtt(
     let (cup_counter_tx, cup_counter_rx) = mpsc::channel::<u64>();
     let (mqtt_status_tx, mqtt_status_rx) = mpsc::channel::<ConnectionStatus>();
 
-    let _ = client.subscribe(&cup_counter_topic, QoS::AtMostOnce);
+    if let Err(e) = client.subscribe(&cup_counter_topic, QoS::AtMostOnce) {
+        warn!("MQTT subscribe to '{}' failed: {:?}", cup_counter_topic, e);
+    }
 
     std::thread::spawn(move || {
         for notification in connection.iter() {

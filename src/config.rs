@@ -59,11 +59,10 @@ impl AppConfig {
             url: setting("MARATUI_MQTT_URL")
                 .unwrap_or_else(|| "mqtt://broker.emqx.io:1883".to_string()),
             client_id: setting("MARATUI_MQTT_CLIENT_ID").unwrap_or_else(|| {
-                if cfg!(feature = "simulator") {
-                    "maratui-sim".to_string()
-                } else {
-                    "maratui-esp32".to_string()
-                }
+                #[cfg(feature = "simulator")]
+                { "maratui-sim".to_string() }
+                #[cfg(not(feature = "simulator"))]
+                { "maratui-esp32".to_string() }
             }),
             username: setting("MARATUI_MQTT_USERNAME"),
             password: setting("MARATUI_MQTT_PASSWORD"),

@@ -303,18 +303,20 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
         }
 
         if app.backlight_active() {
-            backlight.set_high().unwrap();
-        } else {
-            backlight.set_low().unwrap();
+            if let Err(e) = backlight.set_high() {
+                warn!("backlight set_high failed: {:?}", e);
+            }
+        } else if let Err(e) = backlight.set_low() {
+            warn!("backlight set_low failed: {:?}", e);
         }
 
         app.render_image(terminal.backend_mut().display_mut());
 
-        terminal
-            .draw(|f| {
-                app.draw(f);
-            })
-            .unwrap();
+        if let Err(e) = terminal.draw(|f| {
+            app.draw(f);
+        }) {
+            warn!("terminal draw failed: {:?}", e);
+        }
 
         // Yield to the FreeRTOS scheduler so the UART task and Wi-Fi/MQTT stack
         // get CPU time between render frames.
@@ -336,6 +338,11 @@ fn min_stage_delay(started_at: Instant) {
 }
 
 fn query_wifi_rssi() -> Option<i32> {
+    // SAFETY: esp_wifi_sta_get_ap_info requires the Wi-Fi driver to be started and STA to
+    // have associated at least once; both conditions are guaranteed by `init_wifi` completing
+    // before this is ever called.  `ap_info` lives on the stack for the duration of the call,
+    // so the pointer passed to the C function is valid.  zeroed() is the documented way to
+    // initialise this POD struct before passing it as an out-parameter.
     let mut ap_info: esp_idf_svc::sys::wifi_ap_record_t = unsafe { core::mem::zeroed() };
     if unsafe { esp_idf_svc::sys::esp_wifi_sta_get_ap_info(&mut ap_info) } == 0 {
         Some(i32::from(ap_info.rssi))
@@ -345,6 +352,8 @@ fn query_wifi_rssi() -> Option<i32> {
 }
 
 fn query_free_heap() -> u32 {
+    // SAFETY: esp_get_free_heap_size is a stateless read of the FreeRTOS heap allocator
+    // counters and is safe to call from any task context at any time.
     unsafe { esp_idf_svc::sys::esp_get_free_heap_size() }
 }
 

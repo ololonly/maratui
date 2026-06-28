@@ -45,6 +45,7 @@ pub struct TelemetryFrame {
 }
 
 impl TelemetryFrame {
+    #[cfg(any(test, feature = "simulator"))]
     pub fn debug_frame() -> Self {
         Self {
             raw_string: "C1.10,122,128,092,0000,1,0".to_string(),
@@ -60,6 +61,7 @@ impl TelemetryFrame {
         }
     }
 
+    #[cfg(any(test, feature = "simulator"))]
     pub fn debug_pump_on_frame() -> Self {
         Self {
             raw_string: "C1.10,120,138,090,0000,1,1".to_string(),
@@ -75,6 +77,7 @@ impl TelemetryFrame {
         }
     }
 
+    #[cfg(any(test, feature = "simulator"))]
     pub fn debug_no_water_frame() -> Self {
         Self {
             raw_string: "C1.10,122,L65,085,0000,0,0".to_string(),

@@ -18,10 +18,7 @@ impl AppStateMachine {
         info!("Handling event: {:?}", event);
 
         if event.is_telemetry_event() {
-            state.events_log.push_front(format!("Event: {:?}", event));
-            if state.events_log.len() > 10 {
-                state.events_log.pop_back();
-            }
+            state.push_event_log(format!("Event: {:?}", event));
         }
         match event {
             // ===== Telemetry Events =====
@@ -93,10 +90,7 @@ impl AppStateMachine {
             AppEvent::WifiStatusChanged(status) => {
                 match &status {
                     ConnectionStatus::Connected | ConnectionStatus::Disconnected => {
-                        state.events_log.push_front(format!("Wi-Fi: {:?}", status));
-                        if state.events_log.len() > 10 {
-                            state.events_log.pop_back();
-                        }
+                        state.push_event_log(format!("Wi-Fi: {:?}", status));
                     }
                     _ => {}
                 }
@@ -110,10 +104,7 @@ impl AppStateMachine {
                     _ => false,
                 };
                 if should_log {
-                    state.events_log.push_front(format!("MQTT: {:?}", status));
-                    if state.events_log.len() > 10 {
-                        state.events_log.pop_back();
-                    }
+                    state.push_event_log(format!("MQTT: {:?}", status));
                 }
                 state.mqtt_status = status;
             }
@@ -221,9 +212,9 @@ impl AppStateMachine {
     }
 
     /// Handle multiple events in sequence
-    pub fn handle_events(state: &mut GlobalAppState, events: Vec<AppEvent>) {
+    pub fn handle_events(state: &mut GlobalAppState, events: &[AppEvent]) {
         for event in events {
-            Self::handle_event(state, event);
+            Self::handle_event(state, event.clone());
         }
     }
 }
@@ -233,7 +224,26 @@ fn json_opt_num<T: std::fmt::Display>(opt: Option<T>) -> String {
 }
 
 fn json_opt_str(opt: Option<&str>) -> String {
-    opt.map_or_else(|| "null".to_string(), |s| format!("\"{}\"", s))
+    opt.map_or_else(|| "null".to_string(), |s| format!("\"{}\"", json_escape(s)))
+}
+
+/// Escapes a string for embedding inside a JSON double-quoted value.
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => {
+                let _ = core::fmt::write(&mut out, format_args!("\\u{:04X}", c as u32));
+            }
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 fn telemetry_payload(frame: &TelemetryFrame) -> String {
@@ -266,7 +276,7 @@ fn device_status_payload(info: &DeviceInfo) -> String {
     format!(
         "{{\"uptime_s\":{},\"wifi_ssid\":\"{}\",\"wifi_rssi\":{},\"ip\":{},\"free_heap_b\":{},\"last_telemetry_age_s\":{}}}",
         info.uptime_s,
-        info.wifi_ssid,
+        json_escape(&info.wifi_ssid),
         json_opt_num(info.wifi_rssi),
         json_opt_str(info.ip.as_deref()),
         json_opt_num(info.free_heap_b),
@@ -430,7 +440,7 @@ mod tests {
             AppEvent::WaterRefillNeeded { code: 65 },
         ];
 
-        AppStateMachine::handle_events(&mut state, events);
+        AppStateMachine::handle_events(&mut state, &events);
 
         assert!(state.extraction_state.is_extracting());
         assert!(state.has_error());

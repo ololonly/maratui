@@ -61,7 +61,7 @@ MARATUI_MQTT_TOPIC_PREFIX=mara
 `run_app` is re-exported from either `setup.rs` (device) or `setup_simulator.rs` (simulator). Both implement the same polling loop: read UART/keyboard input → update telemetry → handle button presses → drain outbound MQTT queue → render.
 
 ### `MaraUiApp` trait (`src/app.rs`)
-The public interface all platform setups call. `MaraUi` is the concrete implementation. `draw()` dispatches to the active screen; `render_image()` blits a raw RGB565 asset directly to the embedded display (bypassing Ratatui), used for the rat barista sprite on the Main screen.
+The public interface all platform setups call. `MaraUi` is the concrete implementation. `draw()` dispatches to the active screen; `render_image()` blits a raw RGB565 asset directly to the embedded display (bypassing Ratatui), used for the rat barista sprite on the **Connecting screen** (displayed while waiting for the first UART frame).
 
 ### State management (`src/state/`)
 - `GlobalAppState` — single source of truth, passed by reference everywhere. Holds current screen, extraction state, machine state, connection statuses, MQTT outbound queue, and error.
@@ -71,10 +71,10 @@ The public interface all platform setups call. `MaraUi` is the concrete implemen
 ### Telemetry (`src/telemetry/`)
 - `parse_uart_line()` parses the machine's UART format: `<ModeChar><Version>,<boiler_now>,<boiler_target_or_Lxx>,<hx_now>,<boost>,<heating>,<pump>`
 - `update_state_with_events()` computes derived events (shot start/end, water refill, mode change) from frame-to-frame transitions.
-- `MachineState` holds rolling `VecDeque<f64>` buffers (capped at 300 points each, pushed in triples) for the three temperature series shown in the Graphs screen.
+- `MachineState` holds three rolling `VecDeque<f64>` buffers (one per temperature series, capped at 300 points each — a 5-minute window at the 1 Hz sampling rate) shown in the Graphs screen.
 
 ### Screens (`src/screens/`)
-Each screen is a zero-size struct implementing the `Board` trait (`fn render(state, area, frame)`). Screen rotation (Button1 short = next, Button2 short = previous) wraps through `[Main, Dashboard, Graphs]`; the `Debug` screen is only reachable via Button1+Button2 simultaneously.
+Each screen is a zero-size struct implementing the `Board` trait (`fn render(state, area, frame)`). There are two user-navigable screens: `Dashboard` (default) and `Graphs`; Button1 short press toggles between them. The `Debug` screen is only reachable via Button1 long press (and exits the same way).
 
 ### Assets (`assets/`)
 Raw RGB565 image files are `include_bytes!`-embedded at compile time. To regenerate from PNG:
