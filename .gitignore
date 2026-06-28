@@ -1,6 +1,7 @@
 /target
 /.embuild
 .env
+*.local.json
 
 # KiCad
 hardware/**/*.bak
@@ -11,3 +12,4 @@ hardware/**/~*
 hardware/**/fp-info-cache
 hardware/.history/
 hardware/**/*:Zone.Identifier
+
