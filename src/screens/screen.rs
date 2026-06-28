@@ -36,3 +36,31 @@ pub trait Board {
     /// Render the screen with the given application state
     fn render(state: &GlobalAppState, area: Rect, frame: &mut Frame);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_screen_next_cycles_dashboard_graphs() {
+        assert_eq!(Screen::Dashboard.next(), Screen::Graphs);
+        assert_eq!(Screen::Graphs.next(), Screen::Dashboard);
+    }
+
+    #[test]
+    fn test_screen_next_debug_stays() {
+        assert_eq!(Screen::Debug.next(), Screen::Debug);
+    }
+
+    #[test]
+    fn test_screen_previous_mirrors_next() {
+        assert_eq!(Screen::Dashboard.previous(), Screen::Dashboard.next());
+        assert_eq!(Screen::Graphs.previous(), Screen::Graphs.next());
+        assert_eq!(Screen::Debug.previous(), Screen::Debug.next());
+    }
+
+    #[test]
+    fn test_screen_default_is_dashboard() {
+        assert_eq!(Screen::default(), Screen::Dashboard);
+    }
+}

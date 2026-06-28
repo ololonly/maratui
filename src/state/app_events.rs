@@ -157,6 +157,7 @@ impl std::fmt::Display for AppEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::telemetry::MachineMode;
 
     #[test]
     fn test_app_event_from_telemetry() {
@@ -166,12 +167,48 @@ mod tests {
     }
 
     #[test]
+    fn test_from_telemetry_all_variants() {
+        assert_eq!(
+            AppEvent::from_telemetry(TelemetryEvent::ShotEnded { duration: 30 }),
+            AppEvent::ShotEnded { duration: 30 }
+        );
+        assert_eq!(
+            AppEvent::from_telemetry(TelemetryEvent::ShotAborted { duration: 5 }),
+            AppEvent::ShotAborted { duration: 5 }
+        );
+        assert_eq!(
+            AppEvent::from_telemetry(TelemetryEvent::ModeChanged {
+                from: MachineMode::Coffee,
+                to: MachineMode::SteamS
+            }),
+            AppEvent::ModeChanged {
+                from: MachineMode::Coffee,
+                to: MachineMode::SteamS
+            }
+        );
+        assert_eq!(
+            AppEvent::from_telemetry(TelemetryEvent::WaterRefillNeeded { code: 65 }),
+            AppEvent::WaterRefillNeeded { code: 65 }
+        );
+        assert_eq!(
+            AppEvent::from_telemetry(TelemetryEvent::WaterRefillCleared),
+            AppEvent::WaterRefillCleared
+        );
+    }
+
+    #[test]
     fn test_app_event_is_telemetry_event() {
         assert!(AppEvent::ShotStarted.is_telemetry_event());
         assert!(AppEvent::ShotEnded { duration: 30 }.is_telemetry_event());
         assert!(AppEvent::ShotAborted { duration: 5 }.is_telemetry_event());
         assert!(AppEvent::WaterRefillNeeded { code: 65 }.is_telemetry_event());
         assert!(AppEvent::WaterRefillCleared.is_telemetry_event());
+        assert!(AppEvent::ModeChanged {
+            from: MachineMode::Coffee,
+            to: MachineMode::SteamS
+        }
+        .is_telemetry_event());
+        assert!(AppEvent::CupCounterUpdated { cups: 1 }.is_telemetry_event());
 
         // Infrastructure events must NOT appear in the telemetry log
         assert!(
@@ -182,7 +219,6 @@ mod tests {
             !AppEvent::MqttStatusChanged(crate::state::ConnectionStatus::Connected)
                 .is_telemetry_event()
         );
-        assert!(AppEvent::CupCounterUpdated { cups: 1 }.is_telemetry_event());
         assert!(
             !AppEvent::PublishMqttEvent {
                 topic_suffix: "t".into(),
@@ -190,13 +226,107 @@ mod tests {
             }
             .is_telemetry_event()
         );
+        assert!(!AppEvent::NextScreen.is_telemetry_event());
+        assert!(!AppEvent::PreviousScreen.is_telemetry_event());
+        assert!(!AppEvent::DebugScreen.is_telemetry_event());
+        assert!(!AppEvent::ErrorOccurred { error: "e".into() }.is_telemetry_event());
+        assert!(!AppEvent::ErrorCleared.is_telemetry_event());
+        assert!(!AppEvent::LoadingComplete.is_telemetry_event());
+    }
 
+    #[test]
+    fn test_app_event_is_ui_event() {
         assert!(AppEvent::NextScreen.is_ui_event());
+        assert!(AppEvent::PreviousScreen.is_ui_event());
+        assert!(AppEvent::DebugScreen.is_ui_event());
+        assert!(AppEvent::ErrorOccurred { error: "oops".into() }.is_ui_event());
+        assert!(AppEvent::ErrorCleared.is_ui_event());
+
+        // Non-UI events
+        assert!(!AppEvent::ShotStarted.is_ui_event());
+        assert!(!AppEvent::ShotEnded { duration: 30 }.is_ui_event());
+        assert!(!AppEvent::WaterRefillCleared.is_ui_event());
+        assert!(!AppEvent::CupCounterUpdated { cups: 1 }.is_ui_event());
+        assert!(
+            !AppEvent::WifiStatusChanged(crate::state::ConnectionStatus::Connected).is_ui_event()
+        );
+        assert!(!AppEvent::LoadingComplete.is_ui_event());
     }
 
     #[test]
     fn test_app_event_display() {
-        let event = AppEvent::ShotStarted;
-        assert_eq!(event.to_string(), "Shot Started");
+        assert_eq!(AppEvent::ShotStarted.to_string(), "Shot Started");
+        assert_eq!(
+            AppEvent::ShotEnded { duration: 42 }.to_string(),
+            "Shot Ended (42 s)"
+        );
+        assert_eq!(
+            AppEvent::ShotAborted { duration: 3 }.to_string(),
+            "Shot Aborted (3 s)"
+        );
+        assert_eq!(
+            AppEvent::ModeChanged {
+                from: MachineMode::Coffee,
+                to: MachineMode::SteamS
+            }
+            .to_string(),
+            "Mode Changed: Coffee → Steam"
+        );
+        assert_eq!(
+            AppEvent::WaterRefillNeeded { code: 7 }.to_string(),
+            "Water Refill Needed (code: 7)"
+        );
+        assert_eq!(
+            AppEvent::WaterRefillCleared.to_string(),
+            "Water Refill Cleared"
+        );
+        assert_eq!(AppEvent::NextScreen.to_string(), "Next Screen");
+        assert_eq!(AppEvent::PreviousScreen.to_string(), "Previous Screen");
+        assert_eq!(AppEvent::DebugScreen.to_string(), "Debug Screen");
+        assert_eq!(
+            AppEvent::ErrorOccurred {
+                error: "boom".into()
+            }
+            .to_string(),
+            "Error: boom"
+        );
+        assert_eq!(AppEvent::ErrorCleared.to_string(), "Error Cleared");
+        assert_eq!(
+            AppEvent::WifiStatusChanged(crate::state::ConnectionStatus::Connected).to_string(),
+            "Wi-Fi status: Connected"
+        );
+        assert_eq!(
+            AppEvent::MqttStatusChanged(crate::state::ConnectionStatus::Disconnected).to_string(),
+            "MQTT status: Disconnected"
+        );
+        assert_eq!(
+            AppEvent::CupCounterUpdated { cups: 5 }.to_string(),
+            "Cup counter updated: 5"
+        );
+        assert_eq!(
+            AppEvent::PublishMqttEvent {
+                topic_suffix: "evt".into(),
+                payload: "{}".into()
+            }
+            .to_string(),
+            "Publish MQTT event: suffix='evt' payload='{}'"
+        );
+        assert_eq!(
+            AppEvent::DeviceInfoUpdated(crate::state::DeviceInfo {
+                uptime_s: 120,
+                ..Default::default()
+            })
+            .to_string(),
+            "Device info updated (uptime=120s)"
+        );
+        assert_eq!(
+            AppEvent::LoadingStage {
+                message: "Connecting",
+                progress: 50
+            }
+            .to_string(),
+            "Loading [50%]: Connecting"
+        );
+        assert_eq!(AppEvent::LoadingComplete.to_string(), "Loading complete");
     }
 }
