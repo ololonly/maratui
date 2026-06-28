@@ -203,11 +203,13 @@ mod tests {
         assert!(AppEvent::ShotAborted { duration: 5 }.is_telemetry_event());
         assert!(AppEvent::WaterRefillNeeded { code: 65 }.is_telemetry_event());
         assert!(AppEvent::WaterRefillCleared.is_telemetry_event());
-        assert!(AppEvent::ModeChanged {
-            from: MachineMode::Coffee,
-            to: MachineMode::SteamS
-        }
-        .is_telemetry_event());
+        assert!(
+            AppEvent::ModeChanged {
+                from: MachineMode::Coffee,
+                to: MachineMode::SteamS
+            }
+            .is_telemetry_event()
+        );
         assert!(AppEvent::CupCounterUpdated { cups: 1 }.is_telemetry_event());
 
         // Infrastructure events must NOT appear in the telemetry log
@@ -239,7 +241,12 @@ mod tests {
         assert!(AppEvent::NextScreen.is_ui_event());
         assert!(AppEvent::PreviousScreen.is_ui_event());
         assert!(AppEvent::DebugScreen.is_ui_event());
-        assert!(AppEvent::ErrorOccurred { error: "oops".into() }.is_ui_event());
+        assert!(
+            AppEvent::ErrorOccurred {
+                error: "oops".into()
+            }
+            .is_ui_event()
+        );
         assert!(AppEvent::ErrorCleared.is_ui_event());
 
         // Non-UI events

@@ -215,10 +215,12 @@ mod tests {
 
         let result = AppConfig::from_env();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid MARATUI_MQTT_ENABLED value"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid MARATUI_MQTT_ENABLED value")
+        );
     }
 
     #[test]
