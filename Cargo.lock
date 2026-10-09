@@ -1410,7 +1410,7 @@ dependencies = [
 
 [[package]]
 name = "maratui"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "anyhow",
  "display-interface-spi",
