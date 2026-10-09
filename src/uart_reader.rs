@@ -1,9 +1,9 @@
 use crate::telemetry::{TelemetryFrame, parse_uart_line};
 use esp_idf_svc::hal::delay::FreeRtos;
-use esp_idf_svc::hal::gpio::AnyIOPin;
-use esp_idf_svc::hal::prelude::*;
+use esp_idf_svc::hal::gpio::{AnyIOPin, InputPin, OutputPin};
 use esp_idf_svc::hal::uart::config::{Config, DataBits, Parity, StopBits};
 use esp_idf_svc::hal::uart::{UART1, UartDriver};
+use esp_idf_svc::hal::units::Hertz;
 use esp_idf_svc::sys::EspError;
 use log::{info, warn};
 use std::sync::mpsc::Sender;
@@ -19,9 +19,9 @@ pub struct UartReader {
 impl UartReader {
     /// Creates a new UART reader configured for UART1 at 9600 8N1.
     pub fn new(
-        uart: UART1,
-        tx_pin: impl Into<AnyIOPin>,
-        rx_pin: impl Into<AnyIOPin>,
+        uart: UART1<'static>,
+        tx_pin: impl OutputPin + 'static,
+        rx_pin: impl InputPin + 'static,
     ) -> Result<Self, EspError> {
         let mut config = Config::new();
         config.baudrate = Hertz(9600);
@@ -32,8 +32,8 @@ impl UartReader {
 
         let uart = UartDriver::new(
             uart,
-            tx_pin.into(),
-            rx_pin.into(),
+            tx_pin,
+            rx_pin,
             Option::<AnyIOPin>::None,
             Option::<AnyIOPin>::None,
             &config,
