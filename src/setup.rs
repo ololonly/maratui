@@ -13,8 +13,9 @@ use crate::uart_reader::UartReader;
 use display_interface_spi::SPIInterface;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::gpio::{AnyIOPin, Gpio22, Gpio23, InterruptType, Output, PinDriver, Pull};
-use esp_idf_svc::hal::prelude::*;
+use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::hal::spi::{SPI2, SpiConfig, SpiDeviceDriver, SpiDriver};
+use esp_idf_svc::hal::units::Hertz;
 use esp_idf_svc::ipv4::{
     ClientConfiguration as IpClientConfiguration, Configuration as IpConfiguration,
     DHCPClientSettings,
@@ -34,18 +35,18 @@ use std::time::{Duration, Instant};
 
 type DisplayResult<'a> = anyhow::Result<
     Ili9341<
-        SPIInterface<SpiDeviceDriver<'a, SpiDriver<'a>>, PinDriver<'a, Gpio23, Output>>,
-        PinDriver<'a, Gpio22, Output>,
+        SPIInterface<SpiDeviceDriver<'a, SpiDriver<'a>>, PinDriver<'a, Output>>,
+        PinDriver<'a, Output>,
     >,
 >;
 
 fn get_ili9341<'a>(
-    spi_p: SPI2,
-    dc: esp_idf_svc::hal::gpio::Gpio23,
-    mosi: esp_idf_svc::hal::gpio::Gpio21,
-    sclk: esp_idf_svc::hal::gpio::Gpio18,
-    cs: Option<esp_idf_svc::hal::gpio::Gpio19>,
-    rst: esp_idf_svc::hal::gpio::Gpio22,
+    spi_p: SPI2<'a>,
+    dc: Gpio23<'a>,
+    mosi: esp_idf_svc::hal::gpio::Gpio21<'a>,
+    sclk: esp_idf_svc::hal::gpio::Gpio18<'a>,
+    cs: Option<esp_idf_svc::hal::gpio::Gpio19<'a>>,
+    rst: Gpio22<'a>,
 ) -> DisplayResult<'a> {
     let sdi = Option::<AnyIOPin>::None; // MISO not used for display
 
@@ -102,11 +103,9 @@ fn run_app_hardware(mut app: impl MaraUiApp) {
     let mut backlight = PinDriver::output(peripherals.pins.gpio14).unwrap();
     backlight.set_high().unwrap();
 
-    let mut button1 = PinDriver::input(button1_pin).unwrap();
+    let mut button1 = PinDriver::input(button1_pin, Pull::Up).unwrap();
     button1.set_interrupt_type(InterruptType::NegEdge).unwrap();
     let mut button1_state = ButtonState::default();
-
-    button1.set_pull(Pull::Up).unwrap();
 
     let config = EmbeddedBackendConfig {
         font_regular: MONO_7X14,
@@ -341,7 +340,7 @@ fn query_free_heap() -> u32 {
 }
 
 fn init_wifi(
-    modem: esp_idf_svc::hal::modem::Modem,
+    modem: esp_idf_svc::hal::modem::Modem<'static>,
     app_config: &AppConfig,
 ) -> (EspWifi<'static>, Option<String>) {
     let sys_loop = EspSystemEventLoop::take().expect("Failed to take system event loop");
